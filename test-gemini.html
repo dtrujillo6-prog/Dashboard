@@ -1,0 +1,27 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h1>Gemini API Test</h1>
+<script>
+async function test() {
+    const key = prompt("Enter Gemini API Key to test:");
+    if (!key) return;
+    try {
+        const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${key}`;
+        const res = await fetch(url, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ contents: [{ parts: [{ text: "Hello" }] }] })
+        });
+        const data = await res.json();
+        console.log("Response:", data);
+        alert(res.ok ? "Success!" : "Failed: " + JSON.stringify(data));
+    } catch(e) {
+        console.error(e);
+        alert("Error: " + e.message);
+    }
+}
+test();
+</script>
+</body>
+</html>

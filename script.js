@@ -1,544 +1,845 @@
-// --- State Management ---
-const STORAGE_KEY = 'dashboard_data';
+// Photoshoot Planner Core Logic
 
-// Default state if nothing in localStorage
-const defaultState = {
-    categories: [
-        {
-            id: 'cat_' + Date.now(),
-            name: 'Favorites',
-            links: [
-                { id: 'link_1', name: 'GitHub', url: 'https://github.com' },
-                { id: 'link_2', name: 'YouTube', url: 'https://youtube.com' }
-            ]
-        }
-    ]
+// DOM Elements
+const setupModal = document.getElementById('setup-modal');
+const setupForm = document.getElementById('setup-form');
+const shootTypeSelect = document.getElementById('shoot-type');
+const customTypeGroup = document.getElementById('custom-type-group');
+const customTypeInput = document.getElementById('custom-type');
+const appContainer = document.getElementById('app-container');
+const projectTitle = document.getElementById('project-title');
+
+const tabBtns = document.querySelectorAll('.tab-btn');
+const tabPanes = document.querySelectorAll('.tab-pane');
+
+const workspace = document.getElementById('workspace-canvas');
+const toolImageInput = document.getElementById('image-upload');
+const toolText = document.getElementById('tool-text');
+const toolArrow = document.getElementById('tool-arrow');
+const toolClear = document.getElementById('tool-clear');
+const btnExportToggle = document.getElementById('btn-export-toggle');
+const exportDropdown = document.getElementById('export-dropdown');
+const exportPng = document.getElementById('export-png');
+const exportPdf = document.getElementById('export-pdf');
+const btnAi = document.getElementById('btn-ai');
+
+// Settings Elements
+const settingsPanel = document.getElementById('settings-panel');
+const btnSettings = document.getElementById('btn-settings');
+const btnCloseSettings = document.getElementById('btn-close-settings');
+const btnSaveSettings = document.getElementById('btn-save-settings');
+const aiProviderSelect = document.getElementById('ai-provider');
+const chatgptKeyInput = document.getElementById('chatgpt-key');
+const geminiKeyInput = document.getElementById('gemini-key');
+
+// AI Elements
+const aiPanel = document.getElementById('ai-panel');
+const btnCloseAi = document.getElementById('btn-close-ai');
+const aiMessagesContainer = document.getElementById('ai-messages');
+const aiInput = document.getElementById('ai-input');
+const btnSendAi = document.getElementById('btn-send-ai');
+
+const arrowCanvas = document.getElementById('arrow-layer');
+const arrowCtx = arrowCanvas.getContext('2d');
+
+// State
+let appState = {
+    projectName: 'Untitled Shoot',
+    nodes: [],      // Array of dom elements
+    arrows: [],     // Array of {fromId, toId}
+    currentId: 0,
+    settings: {
+        aiProvider: 'chatgpt',
+        chatgptKey: '',
+        geminiKey: ''
+    }
 };
 
-let appState = { categories: [] };
+let interactionState = {
+    mode: 'select', // select, draw_arrow
+    isDraggingNode: false,
+    dragNode: null,
+    offsetX: 0,
+    offsetY: 0,
+    selectedNode: null,
 
-function loadState() {
-    const saved = localStorage.getItem(STORAGE_KEY);
-    if (saved) {
-        try {
-            appState = JSON.parse(saved);
-        } catch (e) {
-            console.error('Failed to parse state from localStorage', e);
-            appState = JSON.parse(JSON.stringify(defaultState));
+    // Arrow drawing temp state
+    isDrawing: false,
+    arrowStartNode: null,
+    mouseX: 0,
+    mouseY: 0,
+
+    // Panning canvas state
+    isPanning: false,
+    panStartX: 0,
+    panStartY: 0,
+    camX: 0,
+    camY: 0
+};
+
+// --- INIT & SETUP --- //
+function init() {
+    resizeCanvas();
+    window.addEventListener('resize', resizeCanvas);
+
+    // Setup listeners
+    shootTypeSelect.addEventListener('change', handleShootTypeChange);
+    setupForm.addEventListener('submit', handleSetupSubmit);
+
+    // Tabs
+    tabBtns.forEach(btn => {
+        btn.addEventListener('click', (e) => switchTab(btn.dataset.tab));
+    });
+
+    // Tools
+    toolImageInput.addEventListener('change', handleImageUpload);
+    toolText.addEventListener('click', handleAddText);
+    toolArrow.addEventListener('click', toggleArrowMode);
+    toolClear.addEventListener('click', clearBoard);
+    btnExportToggle.addEventListener('click', (e) => {
+        e.stopPropagation();
+        exportDropdown.classList.toggle('hidden');
+    });
+
+    document.addEventListener('click', () => {
+        exportDropdown.classList.add('hidden');
+    });
+
+    exportPng.addEventListener('click', () => handleExport('png'));
+    exportPdf.addEventListener('click', () => handleExport('pdf'));
+
+    // Settings
+    btnSettings.addEventListener('click', toggleSettingsPanel);
+    btnCloseSettings.addEventListener('click', toggleSettingsPanel);
+    btnSaveSettings.addEventListener('click', handleSaveSettings);
+
+    // AI
+    btnAi.addEventListener('click', toggleAiPanel);
+    btnCloseAi.addEventListener('click', toggleAiPanel);
+    btnSendAi.addEventListener('click', handleSendAiMessage);
+    aiInput.addEventListener('keydown', (e) => {
+        if (e.key === 'Enter' && !e.shiftKey) {
+            e.preventDefault();
+            handleSendAiMessage();
         }
+    });
+
+    // Workspace events
+    workspace.addEventListener('mousedown', handleWorkspaceMouseDown);
+    window.addEventListener('mousemove', handleMouseMove);
+    window.addEventListener('mouseup', handleMouseUp);
+
+    // Load from local storage if exists
+    loadState();
+
+    requestAnimationFrame(renderLoop);
+}
+
+function handleShootTypeChange(e) {
+    if (e.target.value === 'Custom') {
+        customTypeGroup.classList.remove('hidden');
+        customTypeInput.required = true;
     } else {
-        appState = JSON.parse(JSON.stringify(defaultState));
+        customTypeGroup.classList.add('hidden');
+        customTypeInput.required = false;
+    }
+}
+
+function handleSetupSubmit(e) {
+    e.preventDefault();
+    const type = shootTypeSelect.value;
+    const name = type === 'Custom' ? customTypeInput.value : type;
+
+    appState.projectName = name;
+    projectTitle.textContent = name;
+
+    setupModal.classList.add('hidden');
+    appContainer.classList.remove('hidden');
+
+    // Crucial: The canvas area is now visible, we must resize it so it's not 0x0.
+    setTimeout(resizeCanvas, 0);
+
+    saveState();
+}
+
+function switchTab(tabId) {
+    tabBtns.forEach(b => b.classList.remove('active'));
+    tabPanes.forEach(p => p.classList.remove('active'));
+
+    document.querySelector(`[data-tab="${tabId}"]`).classList.add('active');
+    document.getElementById(`tab-${tabId}`).classList.add('active');
+
+    if (tabId === 'board') {
+        setTimeout(resizeCanvas, 0);
+    }
+}
+
+// --- NODE CREATION --- //
+
+function generateId() {
+    return 'node_' + (++appState.currentId);
+}
+
+function handleImageUpload(e) {
+    const files = e.target.files;
+    for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        if (!file.type.startsWith('image/')) continue;
+
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            createImageNode(event.target.result, 100 + (i * 20), 100 + (i * 20));
+        };
+        reader.readAsDataURL(file);
+    }
+    e.target.value = ''; // Reset
+}
+
+function handleAddText() {
+    createTextElement('New Note', 200, 200);
+}
+
+function createNodeWrapper(id, x, y, type) {
+    const el = document.createElement('div');
+    el.id = id;
+    el.className = `node node-${type}`;
+    el.style.left = `${x}px`;
+    el.style.top = `${y}px`;
+
+    // Controls overlay
+    const controls = document.createElement('div');
+    controls.className = 'node-controls';
+
+    // Color highlights
+    const colors = ['none', 'red', 'blue', 'green', 'yellow', 'pink'];
+    colors.forEach(color => {
+        const btn = document.createElement('button');
+        btn.className = 'control-btn';
+        if (color !== 'none') {
+            const dot = document.createElement('span');
+            dot.className = 'color-dot';
+            dot.style.backgroundColor = `var(--highlight-${color}, ${color})`;
+            btn.appendChild(dot);
+            btn.onclick = (e) => { e.stopPropagation(); setNodeColor(el, color); };
+        } else {
+            btn.innerHTML = '<span class="material-icons-round" style="font-size:16px;">format_color_reset</span>';
+            btn.onclick = (e) => { e.stopPropagation(); setNodeColor(el, 'none'); };
+        }
+        controls.appendChild(btn);
+    });
+
+    // Clone
+    const cloneBtn = document.createElement('button');
+    cloneBtn.className = 'control-btn';
+    cloneBtn.innerHTML = '<span class="material-icons-round" style="font-size:16px;">content_copy</span>';
+    cloneBtn.onclick = (e) => { e.stopPropagation(); cloneNode(el); };
+    controls.appendChild(cloneBtn);
+
+    // Delete
+    const delBtn = document.createElement('button');
+    delBtn.className = 'control-btn';
+    delBtn.innerHTML = '<span class="material-icons-round" style="font-size:16px; color:#ef4444;">delete</span>';
+    delBtn.onclick = (e) => { e.stopPropagation(); deleteNode(el); };
+    controls.appendChild(delBtn);
+
+    el.appendChild(controls);
+    workspace.appendChild(el);
+    appState.nodes.push(el);
+    return el;
+}
+
+function createImageNode(src, x, y) {
+    const id = generateId();
+    const el = createNodeWrapper(id, x, y, 'image');
+
+    const img = document.createElement('img');
+    img.src = src;
+    el.appendChild(img);
+}
+
+function createTextElement(content, x, y) {
+    const id = generateId();
+    const el = createNodeWrapper(id, x, y, 'text');
+
+    const textDiv = document.createElement('div');
+    textDiv.className = 'node-text-content';
+    textDiv.dataset.id = id;
+    textDiv.contentEditable = true;
+    textDiv.textContent = content;
+
+    textDiv.addEventListener('mousedown', (e) => {
+        // Prevent drag if editing text
+        if (document.activeElement === textDiv) {
+            e.stopPropagation();
+        }
+    });
+
+    textDiv.addEventListener('input', saveStateDebounced);
+
+    el.appendChild(textDiv);
+}
+
+// --- NODE OPERATIONS --- //
+
+function setNodeColor(node, color) {
+    // Remove old highlight classes
+    node.className = node.className.replace(/\bhighlight-\S+/g, '');
+    if (color !== 'none') {
+        node.classList.add(`highlight-${color}`);
+    }
+    saveState();
+}
+
+function deleteNode(node) {
+    // cascade delete arrows
+    appState.arrows = appState.arrows.filter(a => a.from !== node.id && a.to !== node.id);
+
+    appState.nodes = appState.nodes.filter(n => n.id !== node.id);
+    node.remove();
+    if (interactionState.selectedNode === node) deselectAll();
+    saveState();
+}
+
+function cloneNode(node) {
+    const rect = node.getBoundingClientRect();
+    const workRect = workspace.getBoundingClientRect();
+    const x = rect.left - workRect.left + 30;
+    const y = rect.top - workRect.top + 30;
+
+    if (node.classList.contains('node-image')) {
+        const img = node.querySelector('img');
+        createImageNode(img.src, x, y);
+    } else if (node.classList.contains('node-text')) {
+        const text = node.querySelector('.node-text-content').textContent;
+        createTextElement(text, x, y);
+    }
+}
+
+function clearBoard() {
+    if (confirm('Are you sure you want to clear the entire board?')) {
+        appState.nodes.forEach(n => n.remove());
+        appState.nodes = [];
+        appState.arrows = [];
         saveState();
     }
 }
 
-function saveState() {
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(appState));
+// --- INTERACTION / DRAGGING --- //
+
+function deselectAll() {
+    appState.nodes.forEach(n => n.classList.remove('selected'));
+    interactionState.selectedNode = null;
 }
 
-// --- Theme Management ---
-const THEME_KEY = 'dashboard_theme';
+function handleWorkspaceMouseDown(e) {
+    // Find closest node
+    const node = e.target.closest('.node');
 
-function loadTheme() {
-    const savedTheme = localStorage.getItem(THEME_KEY) || 'dark';
-    setTheme(savedTheme);
-}
+    if (interactionState.mode === 'draw_arrow') {
+        if (node) {
+            e.preventDefault(); // Prevent native browser drag/selection of images/text
+            interactionState.isDrawing = true;
+            interactionState.arrowStartNode = node;
 
-function setTheme(theme) {
-    document.documentElement.dataset.theme = theme;
-    localStorage.setItem(THEME_KEY, theme);
-
-    if (DOM.btnThemeToggle) {
-        const iconName = theme === 'dark' ? 'sun' : 'moon';
-        DOM.btnThemeToggle.innerHTML = `<i data-lucide="${iconName}"></i>`;
-        lucide.createIcons();
-    }
-}
-
-function toggleTheme() {
-    const currentTheme = document.documentElement.dataset.theme || 'dark';
-    setTheme(currentTheme === 'dark' ? 'light' : 'dark');
-}
-
-// --- DOM Elements ---
-const DOM = {
-    categoriesContainer: document.getElementById('categories-container'),
-    emptyState: document.getElementById('empty-state'),
-
-    // Buttons
-    btnThemeToggle: document.getElementById('btn-theme-toggle'),
-    btnAddCategory: document.getElementById('btn-add-category'),
-    btnAddLink: document.getElementById('btn-add-link'),
-
-    // Modals
-    modalOverlay: document.getElementById('modal-overlay'),
-    linkModal: document.getElementById('link-modal'),
-    categoryModal: document.getElementById('category-modal'),
-    btnCloseModals: document.querySelectorAll('.btn-close-modal'),
-
-    // Forms
-    linkForm: document.getElementById('link-form'),
-    linkIdInput: document.getElementById('link-id'),
-    linkUrlInput: document.getElementById('link-url'),
-    linkNameInput: document.getElementById('link-name'),
-    linkCategorySelect: document.getElementById('link-category'),
-    linkModalTitle: document.getElementById('link-modal-title'),
-
-    categoryForm: document.getElementById('category-form'),
-    categoryNameInput: document.getElementById('category-name')
-};
-
-// --- Initialization ---
-function init() {
-    loadTheme();
-    loadState();
-    setupEventListeners();
-    render();
-}
-
-// --- Render Logic ---
-function render() {
-    DOM.categoriesContainer.innerHTML = ''; // Clear current
-
-    if (appState.categories.length === 0) {
-        DOM.categoriesContainer.appendChild(DOM.emptyState);
-        DOM.emptyState.style.display = 'flex';
-        DOM.btnAddLink.disabled = true;
-        DOM.btnAddLink.style.opacity = '0.5';
-        DOM.btnAddLink.title = 'Create a category first';
-    } else {
-        DOM.emptyState.style.display = 'none';
-        DOM.btnAddLink.disabled = false;
-        DOM.btnAddLink.style.opacity = '1';
-        DOM.btnAddLink.title = '';
-
-        appState.categories.forEach(category => {
-            const card = createCategoryCard(category);
-            DOM.categoriesContainer.appendChild(card);
-        });
-    }
-
-    // Update Lucide icons for newly rendered elements
-    lucide.createIcons();
-    updateCategorySelect();
-}
-
-function createCategoryCard(category) {
-    const card = document.createElement('div');
-    card.className = 'category-card';
-    card.draggable = true;
-    card.dataset.categoryId = category.id;
-    card.addEventListener('dragstart', handleDragStart);
-    card.addEventListener('dragover', handleDragOver);
-    card.addEventListener('drop', handleDrop);
-    card.addEventListener('dragenter', handleDragEnter);
-    card.addEventListener('dragleave', handleDragLeave);
-    card.addEventListener('dragend', handleDragEnd);
-
-    // Header
-    const header = document.createElement('div');
-    header.className = 'category-header';
-
-    const title = document.createElement('h3');
-    title.textContent = category.name;
-
-    const deleteBtn = document.createElement('button');
-    deleteBtn.className = 'btn-icon danger';
-    deleteBtn.innerHTML = '<i data-lucide="trash-2"></i>';
-    deleteBtn.title = 'Delete Category';
-    deleteBtn.onclick = (e) => {
-        e.stopPropagation();
-        setTimeout(() => deleteCategory(category.id), 10);
-    };
-
-    header.appendChild(title);
-    header.appendChild(deleteBtn);
-    card.appendChild(header);
-
-    // Links List
-    const linksList = document.createElement('div');
-    linksList.className = 'links-list';
-
-    if (category.links.length === 0) {
-        const emptyMsg = document.createElement('div');
-        emptyMsg.style.fontSize = '0.875rem';
-        emptyMsg.style.color = 'var(--text-muted)';
-        emptyMsg.style.fontStyle = 'italic';
-        emptyMsg.style.padding = '0.5rem 0';
-        emptyMsg.textContent = 'No links yet';
-        linksList.appendChild(emptyMsg);
-    } else {
-        category.links.forEach(link => {
-            const linkItem = document.createElement('a');
-            linkItem.className = 'link-item';
-            linkItem.href = link.url;
-            linkItem.draggable = true;
-            linkItem.dataset.linkId = link.id;
-            linkItem.dataset.categoryId = category.id;
-            linkItem.addEventListener('dragstart', handleDragStart);
-            linkItem.addEventListener('dragover', handleDragOver);
-            linkItem.addEventListener('drop', handleDrop);
-            linkItem.addEventListener('dragenter', handleDragEnter);
-            linkItem.addEventListener('dragleave', handleDragLeave);
-            linkItem.addEventListener('dragend', handleDragEnd);
-
-            // Get domain for favicon or initial
-            let domain = '';
-            try {
-                domain = new URL(link.url).hostname;
-            } catch (e) { }
-
-            const content = document.createElement('div');
-            content.className = 'link-content';
-
-            const favicon = document.createElement('div');
-            favicon.className = 'link-favicon';
-            if (domain) {
-                const img = document.createElement('img');
-                img.src = `https://icon.horse/icon/${domain}`;
-                img.alt = '';
-                img.onerror = () => { img.style.display = 'none'; };
-                favicon.appendChild(img);
-            } else {
-                favicon.textContent = link.name.charAt(0).toUpperCase();
-            }
-
-            const name = document.createElement('span');
-            name.className = 'link-name';
-            name.textContent = link.name;
-
-            content.appendChild(favicon);
-            content.appendChild(name);
-
-            const actions = document.createElement('div');
-            actions.className = 'link-actions';
-
-            const editBtn = document.createElement('button');
-            editBtn.className = 'btn-icon';
-            editBtn.innerHTML = '<i data-lucide="edit-2"></i>';
-            editBtn.title = 'Edit Link';
-            editBtn.onclick = (e) => {
-                e.preventDefault(); // Prevent navigating
-                openEditLinkModal(category.id, link);
-            };
-
-            const delBtn = document.createElement('button');
-            delBtn.className = 'btn-icon danger';
-            delBtn.innerHTML = '<i data-lucide="trash"></i>';
-            delBtn.title = 'Delete Link';
-            delBtn.onclick = (e) => {
-                e.preventDefault(); // Prevent navigating
-                e.stopPropagation(); // Prevent drag/drop or parent click interference
-
-                // We use setTimeout to allow the UI to finish rendering the click state 
-                // before the synchronous window.confirm blocks the main thread
-                setTimeout(() => deleteLink(category.id, link.id), 10);
-            };
-
-            actions.appendChild(editBtn);
-            actions.appendChild(delBtn);
-
-            linkItem.appendChild(content);
-            linkItem.appendChild(actions);
-            linksList.appendChild(linkItem);
-        });
-    }
-
-    card.appendChild(linksList);
-    return card;
-}
-
-function updateCategorySelect() {
-    DOM.linkCategorySelect.innerHTML = '';
-    appState.categories.forEach(cat => {
-        const option = document.createElement('option');
-        option.value = cat.id;
-        option.textContent = cat.name;
-        DOM.linkCategorySelect.appendChild(option);
-    });
-}
-
-// --- Drag and Drop Logic ---
-let draggedItem = null;
-let draggedType = null;
-
-function handleDragStart(e) {
-    e.stopPropagation();
-    draggedItem = this;
-    if (this.classList.contains('category-card')) {
-        draggedType = 'category';
-        e.dataTransfer.effectAllowed = 'move';
-    } else if (this.classList.contains('link-item')) {
-        draggedType = 'link';
-        e.dataTransfer.effectAllowed = 'move';
-    }
-    setTimeout(() => this.classList.add('dragging'), 0);
-}
-
-function handleDragOver(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    e.dataTransfer.dropEffect = 'move';
-    return false;
-}
-
-function handleDragEnter(e) {
-    e.preventDefault();
-    e.stopPropagation();
-    if (draggedItem !== this) {
-        if (draggedType === 'category' && this.classList.contains('category-card')) {
-            this.classList.add('drag-over');
-        } else if (draggedType === 'link' && (this.classList.contains('link-item') || this.classList.contains('category-card'))) {
-            this.classList.add('drag-over');
-        }
-    }
-}
-
-function handleDragLeave(e) {
-    e.stopPropagation();
-    this.classList.remove('drag-over');
-}
-
-function handleDrop(e) {
-    e.stopPropagation();
-    this.classList.remove('drag-over');
-
-    if (!draggedItem || this === draggedItem) return false;
-
-    if (draggedType === 'category' && this.classList.contains('category-card')) {
-        const draggedId = draggedItem.dataset.categoryId;
-        const targetId = this.dataset.categoryId;
-
-        const draggedIdx = appState.categories.findIndex(c => c.id === draggedId);
-        const targetIdx = appState.categories.findIndex(c => c.id === targetId);
-
-        if (draggedIdx > -1 && targetIdx > -1) {
-            const [movedCat] = appState.categories.splice(draggedIdx, 1);
-            appState.categories.splice(targetIdx, 0, movedCat);
-            saveAndRender();
-        }
-
-    } else if (draggedType === 'link') {
-        const draggedLinkId = draggedItem.dataset.linkId;
-        const draggedCatId = draggedItem.dataset.categoryId;
-
-        let targetCatId = null;
-        let targetLinkId = null;
-
-        if (this.classList.contains('link-item')) {
-            targetCatId = this.dataset.categoryId;
-            targetLinkId = this.dataset.linkId;
-        } else if (this.classList.contains('category-card')) {
-            targetCatId = this.dataset.categoryId;
-        }
-
-        if (targetCatId) {
-            const sourceCat = appState.categories.find(c => c.id === draggedCatId);
-            const linkIdx = sourceCat.links.findIndex(l => l.id === draggedLinkId);
-
-            if (linkIdx > -1) {
-                const [movedLink] = sourceCat.links.splice(linkIdx, 1);
-                const targetCat = appState.categories.find(c => c.id === targetCatId);
-
-                if (targetLinkId) {
-                    const targetLinkIdx = targetCat.links.findIndex(l => l.id === targetLinkId);
-                    targetCat.links.splice(targetLinkIdx, 0, movedLink);
-                } else {
-                    targetCat.links.push(movedLink);
-                }
-                saveAndRender();
-            }
-        }
-    }
-    return false;
-}
-
-function handleDragEnd(e) {
-    e.stopPropagation();
-    this.classList.remove('dragging');
-    document.querySelectorAll('.drag-over').forEach(el => el.classList.remove('drag-over'));
-    draggedItem = null;
-    draggedType = null;
-}
-
-// --- Interaction Logic ---
-function setupEventListeners() {
-    // Theme Toggle
-    if (DOM.btnThemeToggle) {
-        DOM.btnThemeToggle.addEventListener('click', toggleTheme);
-    }
-
-    // Add Category
-    DOM.btnAddCategory.addEventListener('click', () => {
-        DOM.categoryForm.reset();
-        openModal(DOM.categoryModal);
-        DOM.categoryNameInput.focus();
-    });
-
-    DOM.categoryForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const name = DOM.categoryNameInput.value.trim();
-        if (name) addCategory(name);
-    });
-
-    // Add Link
-    DOM.btnAddLink.addEventListener('click', () => {
-        if (appState.categories.length === 0) return;
-        DOM.linkForm.reset();
-        DOM.linkIdInput.value = '';
-        DOM.linkModalTitle.textContent = 'Add Link';
-        // Select first category by default
-        if (appState.categories.length > 0) {
-            DOM.linkCategorySelect.value = appState.categories[0].id;
-        }
-        openModal(DOM.linkModal);
-        DOM.linkUrlInput.focus();
-    });
-
-    DOM.linkForm.addEventListener('submit', (e) => {
-        e.preventDefault();
-        const id = DOM.linkIdInput.value;
-        const url = DOM.linkUrlInput.value.trim();
-        const name = DOM.linkNameInput.value.trim();
-        const categoryId = DOM.linkCategorySelect.value;
-
-        let validUrl = url;
-        if (!validUrl.startsWith('http://') && !validUrl.startsWith('https://')) {
-            validUrl = 'https://' + validUrl;
-        }
-
-        if (id) {
-            // Editing existing
-            // Find current category of this link to remove it if category changed
-            let oldCategoryId = null;
-            appState.categories.forEach(cat => {
-                if (cat.links.some(l => l.id === id)) oldCategoryId = cat.id;
-            });
-
-            updateLink(oldCategoryId, categoryId, { id, url: validUrl, name });
+            // Get proper relative mouse position to draw arrow instantly
+            const workRect = workspace.getBoundingClientRect();
+            interactionState.mouseX = e.clientX - workRect.left;
+            interactionState.mouseY = e.clientY - workRect.top;
         } else {
-            // Adding new
-            addLink(categoryId, { url: validUrl, name });
+            // Cancel draw mode on click empty
+            interactionState.mode = 'select';
+            document.getElementById('tool-arrow').classList.remove('active');
+            workspace.style.cursor = 'default'; // grab
         }
-    });
-
-    // Modal Close Logic
-    DOM.btnCloseModals.forEach(btn => {
-        btn.addEventListener('click', closeAllModals);
-    });
-
-    DOM.modalOverlay.addEventListener('click', closeAllModals);
-
-    // Auto-fill link name from URL (basic heuristics)
-    DOM.linkUrlInput.addEventListener('blur', () => {
-        if (!DOM.linkNameInput.value && DOM.linkUrlInput.value) {
-            try {
-                let urlStr = DOM.linkUrlInput.value;
-                if (!urlStr.startsWith('http')) urlStr = 'https://' + urlStr;
-                const urlObj = new URL(urlStr);
-                // Extract main domain name (e.g. from www.github.com -> github)
-                const parts = urlObj.hostname.split('.');
-                let name = parts.length > 2 ? parts[parts.length - 2] : parts[0];
-                name = name.charAt(0).toUpperCase() + name.slice(1);
-                DOM.linkNameInput.value = name;
-            } catch (e) { }
-        }
-    });
-}
-
-function openModal(modalEl) {
-    DOM.modalOverlay.classList.add('active');
-    modalEl.classList.add('active');
-}
-
-function closeAllModals() {
-    DOM.modalOverlay.classList.remove('active');
-    DOM.linkModal.classList.remove('active');
-    DOM.categoryModal.classList.remove('active');
-}
-
-function openEditLinkModal(categoryId, link) {
-    DOM.linkIdInput.value = link.id;
-    DOM.linkUrlInput.value = link.url;
-    DOM.linkNameInput.value = link.name;
-    DOM.linkCategorySelect.value = categoryId;
-    DOM.linkModalTitle.textContent = 'Edit Link';
-
-    openModal(DOM.linkModal);
-    DOM.linkNameInput.focus();
-}
-
-// --- CRUD Operations ---
-function addCategory(name) {
-    const newCategory = {
-        id: 'cat_' + Date.now(),
-        name: name,
-        links: []
-    };
-    appState.categories.push(newCategory);
-    saveAndRender();
-    closeAllModals();
-}
-
-function deleteCategory(categoryId) {
-    if (confirm('Are you sure you want to delete this category and all its links?')) {
-        appState.categories = appState.categories.filter(c => c.id !== categoryId);
-        saveAndRender();
+        return; // Skip normal drag logic
     }
-}
 
-function addLink(categoryId, linkData) {
-    const category = appState.categories.find(c => c.id === categoryId);
-    if (category) {
-        category.links.push({
-            id: 'link_' + Date.now(),
-            name: linkData.name,
-            url: linkData.url
-        });
-        saveAndRender();
-        closeAllModals();
-    }
-}
+    if (node) {
+        // Stop editing text if active
+        if (document.activeElement && document.activeElement.contentEditable === 'true' && document.activeElement !== e.target) {
+            document.activeElement.blur();
+        }
 
-function updateLink(oldCategoryId, newCategoryId, linkData) {
-    // If category changed, remove from old, add to new
-    if (oldCategoryId !== newCategoryId) {
-        const oldCat = appState.categories.find(c => c.id === oldCategoryId);
-        if (oldCat) {
-            oldCat.links = oldCat.links.filter(l => l.id !== linkData.id);
-        }
-        const newCat = appState.categories.find(c => c.id === newCategoryId);
-        if (newCat) {
-            newCat.links.push(linkData);
-        }
+        deselectAll();
+        node.classList.add('selected');
+        interactionState.selectedNode = node;
+
+        interactionState.isDraggingNode = true;
+        interactionState.dragNode = node;
+
+        // Calculate offset
+        const rect = node.getBoundingClientRect();
+        interactionState.offsetX = e.clientX - rect.left;
+        interactionState.offsetY = e.clientY - rect.top;
+
+        // Ensure z-index layering is preserved, but no re-appending so arrows don't bug out
+        const allNodes = Array.from(document.querySelectorAll('.node'));
+        allNodes.forEach(n => n.style.zIndex = '10');
+        node.style.zIndex = '100';
+
     } else {
-        // Just update in place
-        const cat = appState.categories.find(c => c.id === oldCategoryId);
-        if (cat) {
-            const linkIndex = cat.links.findIndex(l => l.id === linkData.id);
-            if (linkIndex !== -1) {
-                cat.links[linkIndex] = linkData;
+        deselectAll();
+        // Start panning
+        interactionState.isPanning = true;
+        interactionState.panStartX = e.clientX - interactionState.camX;
+        interactionState.panStartY = e.clientY - interactionState.camY;
+    }
+}
+
+function handleMouseMove(e) {
+    if (interactionState.isDraggingNode && interactionState.dragNode) {
+        const workRect = workspace.getBoundingClientRect();
+        let x = e.clientX - workRect.left - interactionState.offsetX;
+        let y = e.clientY - workRect.top - interactionState.offsetY;
+
+        interactionState.dragNode.style.left = `${x}px`;
+        interactionState.dragNode.style.top = `${y}px`;
+    }
+    else if (interactionState.isDrawing) {
+        const workRect = workspace.getBoundingClientRect();
+        interactionState.mouseX = e.clientX - workRect.left;
+        interactionState.mouseY = e.clientY - workRect.top;
+    }
+    /* Panning disabled for simple single-page layout for now, canvas is absolute
+    else if (interactionState.isPanning) {
+        interactionState.camX = e.clientX - interactionState.panStartX;
+        interactionState.camY = e.clientY - interactionState.panStartY;
+        // Apply transform to nodes...
+    }*/
+}
+
+function handleMouseUp(e) {
+    if (interactionState.isDraggingNode) {
+        interactionState.isDraggingNode = false;
+        interactionState.dragNode = null;
+        saveState();
+    }
+
+    if (interactionState.isDrawing) {
+        const node = e.target.closest('.node');
+        if (node && node !== interactionState.arrowStartNode) {
+            // Complete arrow
+            appState.arrows.push({
+                from: interactionState.arrowStartNode.id,
+                to: node.id
+            });
+            saveState();
+        }
+
+        interactionState.isDrawing = false;
+        interactionState.arrowStartNode = null;
+    }
+
+    interactionState.isPanning = false;
+}
+
+// --- ARROWS & RENDERING --- //
+
+function toggleArrowMode() {
+    if (interactionState.mode === 'draw_arrow') {
+        interactionState.mode = 'select';
+        toolArrow.classList.remove('active');
+        workspace.style.cursor = 'grab';
+    } else {
+        interactionState.mode = 'draw_arrow';
+        toolArrow.classList.add('active');
+        workspace.style.cursor = 'crosshair';
+        deselectAll();
+    }
+}
+
+function resizeCanvas() {
+    const rect = workspace.getBoundingClientRect();
+    arrowCanvas.width = rect.width;
+    arrowCanvas.height = rect.height;
+}
+
+function getCenter(el) {
+    const rect = el.getBoundingClientRect();
+    const workRect = workspace.getBoundingClientRect();
+    // Use the element's actual visual center relative to the workspace container
+    return {
+        x: rect.left - workRect.left + (rect.width / 2),
+        y: rect.top - workRect.top + (rect.height / 2)
+    };
+}
+
+function drawArrowBetweenPoints(x1, y1, x2, y2) {
+    // Arrow head calc
+    const dx = x2 - x1;
+    const dy = y2 - y1;
+    const angle = Math.atan2(dy, dx);
+    const headlen = 15;
+
+    arrowCtx.beginPath();
+    arrowCtx.moveTo(x1, y1);
+
+    // Smooth bezier curve
+    const ctrlDist = Math.abs(dx) * 0.3;
+    arrowCtx.bezierCurveTo(x1 + ctrlDist, y1, x2 - ctrlDist, y2, x2, y2);
+
+    arrowCtx.lineWidth = 3;
+    arrowCtx.strokeStyle = 'rgba(0,0,0,0.3)';
+    arrowCtx.stroke();
+
+    // Draw head
+    arrowCtx.beginPath();
+    arrowCtx.moveTo(x2, y2);
+    arrowCtx.lineTo(x2 - headlen * Math.cos(angle - Math.PI / 6), y2 - headlen * Math.sin(angle - Math.PI / 6));
+    arrowCtx.moveTo(x2, y2);
+    arrowCtx.lineTo(x2 - headlen * Math.cos(angle + Math.PI / 6), y2 - headlen * Math.sin(angle + Math.PI / 6));
+    arrowCtx.stroke();
+}
+
+function renderLoop() {
+    arrowCtx.clearRect(0, 0, arrowCanvas.width, arrowCanvas.height);
+
+    // Draw committed arrows
+    appState.arrows.forEach(arr => {
+        const fromEl = document.getElementById(arr.from);
+        const toEl = document.getElementById(arr.to);
+        if (fromEl && toEl) {
+            const p1 = getCenter(fromEl);
+            const p2 = getCenter(toEl);
+            drawArrowBetweenPoints(p1.x, p1.y, p2.x, p2.y);
+        }
+    });
+
+    // Draw temp arrow
+    if (interactionState.isDrawing && interactionState.arrowStartNode) {
+        const p1 = getCenter(interactionState.arrowStartNode);
+        const p2 = {
+            x: interactionState.mouseX,
+            y: interactionState.mouseY
+        };
+        drawArrowBetweenPoints(p1.x, p1.y, p2.x, p2.y);
+    }
+
+    requestAnimationFrame(renderLoop);
+}
+
+// --- PERSISTENCE --- //
+
+let saveTimeout = null;
+function saveStateDebounced() {
+    clearTimeout(saveTimeout);
+    saveTimeout = setTimeout(saveState, 1000);
+}
+
+function saveState() {
+    // For a real app, serialize DOM cleanly. 
+    // Here we will just save the project name and notes text
+    // as full DOM serialization of image b64 can exceed localstorage limits fast.
+
+    const notesData = {};
+    document.querySelectorAll('.rich-textarea').forEach((ta, idx) => {
+        notesData[idx] = ta.value;
+    });
+
+    localStorage.setItem('photoshoot_planner_state', JSON.stringify({
+        projectName: appState.projectName,
+        notes: notesData,
+        settings: appState.settings
+    }));
+    console.log('State saved passively.');
+}
+
+function loadState() {
+    const saved = localStorage.getItem('photoshoot_planner_state');
+    if (saved) {
+        try {
+            const data = JSON.parse(saved);
+
+            // Restore modal state if already setup
+            if (data.projectName && data.projectName !== 'Untitled Shoot') {
+                appState.projectName = data.projectName;
+                projectTitle.textContent = data.projectName;
+                setupModal.classList.add('hidden');
+                appContainer.classList.remove('hidden');
+
+                // Crucial: Resize once it is visible otherwise arrows won't draw
+                setTimeout(resizeCanvas, 0);
             }
+
+            // Restore notes
+            if (data.notes) {
+                document.querySelectorAll('.rich-textarea').forEach((ta, idx) => {
+                    if (data.notes[idx] && data.notes[idx].trim() !== '') {
+                        ta.value = data.notes[idx];
+                    }
+                });
+            }
+
+            // Restore Settings
+            if (data.settings) {
+                appState.settings = data.settings;
+                loadSettingsUI();
+            }
+
+        } catch (e) {
+            console.error('Failed to load state', e);
         }
     }
-    saveAndRender();
-    closeAllModals();
 }
 
-function deleteLink(categoryId, linkId) {
-    if (confirm('Delete this link?')) {
-        const category = appState.categories.find(c => c.id === categoryId);
-        if (category) {
-            category.links = category.links.filter(l => l.id !== linkId);
-            saveAndRender();
-        }
+// --- EXPORT --- //
+function handleExport(format) {
+    deselectAll(); // Hide controls
+
+    // Switch to board if not there to ensure canvas renders
+    if (!document.getElementById('tab-board').classList.contains('active')) {
+        switchTab('board');
+    }
+
+    const boardArea = document.getElementById('tab-board');
+    btnExportToggle.innerHTML = '<span class="material-icons-round">hourglass_empty</span>Exporting...';
+
+    // Allow DOM to settle, especially if we just switched tabs or removed controls
+    setTimeout(() => {
+        // we use html2canvas to capture the "boardArea" div
+        window.html2canvas(boardArea, {
+            backgroundColor: '#f8f9fa',
+            scale: 2, // high res
+            onclone: (clonedDoc) => {
+                // Force opacity to 1 and remove animation class
+                const clonedBoard = clonedDoc.getElementById('tab-board');
+                if (clonedBoard) {
+                    clonedBoard.classList.remove('fade-in');
+                    clonedBoard.style.opacity = '1';
+                    clonedBoard.style.animation = 'none';
+                }
+
+                // Remove backdrop filters as they frequently cause html2canvas to render elements or the entire canvas semi-transparent
+                clonedDoc.querySelectorAll('.glass-panel, .node-text').forEach(el => {
+                    el.style.backdropFilter = 'none';
+                    el.style.webkitBackdropFilter = 'none';
+                });
+            }
+        }).then(canvas => {
+            const imgData = canvas.toDataURL("image/png");
+            const safeName = appState.projectName.replace(/\s+/g, '_');
+
+            if (format === 'png') {
+                // Save Image Natively
+                const link = document.createElement('a');
+                link.download = `${safeName}_Board.png`;
+                link.href = imgData;
+                link.click();
+            } else if (format === 'pdf') {
+                // Save PDF 
+                const { jsPDF } = window.jspdf;
+                // Calculate orientation based on canvas dimensions
+                const orientation = canvas.width > canvas.height ? 'landscape' : 'portrait';
+                const pdf = new jsPDF({
+                    orientation: orientation,
+                    unit: 'px',
+                    format: [canvas.width, canvas.height]
+                });
+
+                pdf.addImage(imgData, 'PNG', 0, 0, canvas.width, canvas.height);
+                pdf.save(`${safeName}_Planner.pdf`);
+            }
+
+            btnExportToggle.innerHTML = '<span class="material-icons-round">ios_share</span>Export';
+        }).catch(err => {
+            console.error(err);
+            alert('Failed to export. Note: some external images may taint the canvas preventing export due to CORS.');
+            btnExportToggle.innerHTML = '<span class="material-icons-round">ios_share</span>Export';
+        });
+    }, 100);
+}
+
+// --- SETTINGS --- //
+function toggleSettingsPanel() {
+    if (settingsPanel.classList.contains('hidden')) {
+        // Open
+        settingsPanel.classList.remove('hidden');
+        // Small delay to allow display to apply before transitioning right
+        setTimeout(() => {
+            settingsPanel.classList.add('open');
+        }, 10);
+    } else {
+        // Close
+        settingsPanel.classList.remove('open');
+        // Wait for slide animation to finish
+        setTimeout(() => {
+            settingsPanel.classList.add('hidden');
+        }, 400); // matches var(--transition) time essentially, maybe longer
     }
 }
 
-function saveAndRender() {
+function handleSaveSettings() {
+    appState.settings.aiProvider = aiProviderSelect.value;
+    appState.settings.chatgptKey = chatgptKeyInput.value.trim();
+    appState.settings.geminiKey = geminiKeyInput.value.trim();
+
     saveState();
-    render();
+    toggleSettingsPanel();
 }
 
-// Get things started
-document.addEventListener('DOMContentLoaded', init);
+function loadSettingsUI() {
+    if (appState.settings) {
+        aiProviderSelect.value = appState.settings.aiProvider || 'chatgpt';
+        chatgptKeyInput.value = appState.settings.chatgptKey || '';
+        geminiKeyInput.value = appState.settings.geminiKey || '';
+    }
+}
+
+// --- AI ASSISTANT --- //
+function toggleAiPanel() {
+    if (aiPanel.classList.contains('hidden')) {
+        aiPanel.classList.remove('hidden');
+        setTimeout(() => {
+            aiPanel.classList.add('open');
+            aiInput.focus();
+        }, 10);
+    } else {
+        aiPanel.classList.remove('open');
+        setTimeout(() => {
+            aiPanel.classList.add('hidden');
+        }, 400);
+    }
+}
+
+function getShootContext() {
+    // Gather all text from the notes to serve as context
+    let contextStr = `Role: You are an expert photoshoot planning assistant.\n`;
+    contextStr += `Project Name: ${appState.projectName}\n\n`;
+    contextStr += `Photographer's Current Notes:\n`;
+
+    document.querySelectorAll('.rich-textarea').forEach(ta => {
+        if (ta.value.trim().length > 0) {
+            contextStr += `---\n${ta.value}\n---\n`;
+        }
+    });
+    return contextStr;
+}
+
+function appendAiMessage(text, isUser = false) {
+    const msgDiv = document.createElement('div');
+    msgDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
+
+    const contentDiv = document.createElement('div');
+    contentDiv.className = 'message-content';
+    // Basic text formatting (could add a simple markdown parser here later if desired)
+    contentDiv.innerText = text;
+
+    msgDiv.appendChild(contentDiv);
+    aiMessagesContainer.appendChild(msgDiv);
+
+    // Scroll to bottom
+    aiMessagesContainer.scrollTop = aiMessagesContainer.scrollHeight;
+}
+
+function showLoadingIndicator() {
+    const loadingDiv = document.createElement('div');
+    loadingDiv.className = 'message ai-message loading-indicator';
+    loadingDiv.id = 'ai-loading';
+    loadingDiv.innerHTML = `
+        <div class="message-content">
+            <div class="typing-indicator"><span></span><span></span><span></span></div>
+        </div>
+    `;
+    aiMessagesContainer.appendChild(loadingDiv);
+    aiMessagesContainer.scrollTop = aiMessagesContainer.scrollHeight;
+}
+
+function hideLoadingIndicator() {
+    const loader = document.getElementById('ai-loading');
+    if (loader) loader.remove();
+}
+
+async function handleSendAiMessage() {
+    const text = aiInput.value.trim();
+    if (!text) return;
+
+    const provider = appState.settings.aiProvider;
+    const apiKey = provider === 'chatgpt' ? appState.settings.chatgptKey : appState.settings.geminiKey;
+
+    if (!apiKey) {
+        alert(`Please open settings and enter your API Key for ${provider === 'chatgpt' ? 'ChatGPT' : 'Gemini'}.`);
+        return;
+    }
+
+    aiInput.value = '';
+    appendAiMessage(text, true);
+    showLoadingIndicator();
+
+    const systemContext = getShootContext();
+
+    try {
+        let responseText = '';
+
+        if (provider === 'chatgpt') {
+            responseText = await callOpenAI(apiKey, systemContext, text);
+        } else {
+            responseText = await callGemini(apiKey, systemContext, text);
+        }
+
+        hideLoadingIndicator();
+        appendAiMessage(responseText, false);
+
+    } catch (error) {
+        hideLoadingIndicator();
+        console.error("AI Error:", error);
+        appendAiMessage(`Error connecting to AI: ${error.message}. Please check your API key and connection.`);
+    }
+}
+
+// Minimal OpenAI / Gemini Fetch implementations
+async function callOpenAI(apiKey, systemContext, userPrompt) {
+    const res = await fetch('https://api.openai.com/v1/chat/completions', {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+            'Authorization': `Bearer ${apiKey}`
+        },
+        body: JSON.stringify({
+            model: "gpt-3.5-turbo",
+            messages: [
+                { role: "system", content: systemContext },
+                { role: "user", content: userPrompt }
+            ]
+        })
+    });
+
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || res.statusText);
+    }
+
+    const data = await res.json();
+    return data.choices[0].message.content;
+}
+
+async function callGemini(apiKey, systemContext, userPrompt) {
+    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
+
+    // Note: Gemini doesn't have a strict "system" role in the basic generateContent API format we easily use with fetch, 
+    // so we combine it into the user prompt or use the system_instruction field (newer).
+    // Let's combine them into a single string for simplicity here.
+    const combinedPrompt = `${systemContext}\n\nUser Question:\n${userPrompt}`;
+
+    const res = await fetch(url, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json'
+        },
+        body: JSON.stringify({
+            contents: [{
+                parts: [{ text: combinedPrompt }]
+            }]
+        })
+    });
+
+    if (!res.ok) {
+        const err = await res.json();
+        throw new Error(err.error?.message || res.statusText);
+    }
+
+    const data = await res.json();
+    return data.candidates[0].content.parts[0].text;
+}
+
+// Start
+init();

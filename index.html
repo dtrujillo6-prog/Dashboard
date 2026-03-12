@@ -4,103 +4,212 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Dashboard</title>
+    <title>Photoshoot Planner</title>
     <link rel="stylesheet" href="style.css">
-    <link rel="preconnect" href="https://fonts.googleapis.com">
-    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;800;900&display=swap" rel="stylesheet">
-    <!-- Using lucide icons via unpkg -->
-    <script src="https://unpkg.com/lucide@latest"></script>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
 </head>
 
 <body>
-    <div class="app-container">
-        <header class="header">
-            <div class="header-content">
-                <h1>Dashboard</h1>
-                <div class="header-actions">
-                    <button id="btn-theme-toggle" class="btn-icon" title="Toggle Theme">
-                        <i data-lucide="sun"></i>
+
+    <!-- Onboarding / Setup Modal -->
+    <div id="setup-modal" class="modal-overlay">
+        <div class="modal-content glass-panel">
+            <h1>Start Planning</h1>
+            <p class="subtitle">Select your photoshoot type to begin</p>
+
+            <form id="setup-form">
+                <div class="input-group">
+                    <label for="shoot-type">Photoshoot Type</label>
+                    <select id="shoot-type" name="shoot-type">
+                        <option value="Senior Portraits">Senior Portraits</option>
+                        <option value="Graduation Portraits">Graduation Portraits</option>
+                        <option value="Boudoir">Boudoir</option>
+                        <option value="Headshots">Headshots</option>
+                        <option value="Creative Session">Creative Session</option>
+                        <option value="Custom">Custom / Other...</option>
+                    </select>
+                </div>
+
+                <div class="input-group hidden" id="custom-type-group">
+                    <label for="custom-type">Custom Shoot Name</label>
+                    <input type="text" id="custom-type" placeholder="e.g., Elopement in the Woods">
+                </div>
+
+                <button type="submit" class="btn btn-primary mt-4">Create Project<span
+                        class="material-icons-round">arrow_forward</span></button>
+            </form>
+        </div>
+    </div>
+
+    <!-- Main Application UI (Hidden Initially) -->
+    <div id="app-container" class="app-layout hidden">
+
+        <!-- Top Navigation -->
+        <header class="top-nav glass-panel">
+            <div class="nav-left">
+                <span class="material-icons-round logo-icon">camera</span>
+                <h2 id="project-title">My Photoshoot</h2>
+            </div>
+            <div class="nav-tabs">
+                <button class="tab-btn active" data-tab="board">
+                    <span class="material-icons-round">dashboard</span>Board
+                </button>
+                <button class="tab-btn" data-tab="notes">
+                    <span class="material-icons-round">description</span>Notes
+                </button>
+            </div>
+            <div class="nav-actions">
+                <button id="btn-ai" class="btn btn-icon btn-secondary" title="AI Assistant">
+                    <span class="material-icons-round">auto_awesome</span>
+                </button>
+                <button id="btn-settings" class="btn btn-icon btn-secondary" title="Settings">
+                    <span class="material-icons-round">settings</span>
+                </button>
+                <div class="dropdown-container">
+                    <button id="btn-export-toggle" class="btn btn-primary">
+                        <span class="material-icons-round">ios_share</span>Export
                     </button>
-                    <button id="btn-add-category" class="btn btn-secondary">
-                        <i data-lucide="folder-plus"></i> New Category
-                    </button>
-                    <button id="btn-add-link" class="btn btn-primary">
-                        <i data-lucide="plus"></i> Add Link
-                    </button>
+                    <div id="export-dropdown" class="dropdown-menu hidden glass-panel">
+                        <button class="dropdown-item" id="export-png">
+                            <span class="material-icons-round">image</span> Export as PNG
+                        </button>
+                        <button class="dropdown-item" id="export-pdf">
+                            <span class="material-icons-round">picture_as_pdf</span> Export as PDF
+                        </button>
+                    </div>
                 </div>
             </div>
         </header>
 
-        <main class="main-content">
-            <!-- Categories will be injected here -->
-            <div id="categories-container" class="categories-grid">
-                <!-- Example Skeleton structure (will be cleared by JS) -->
-                <div class="empty-state" id="empty-state" style="display: none;">
-                    <i data-lucide="layout-grid"></i>
-                    <h2>No categories yet</h2>
-                    <p>Create a category to start adding links.</p>
+        <!-- Main Content Area -->
+        <main class="content-area">
+
+            <!-- Tab: Mood Board -->
+            <section id="tab-board" class="tab-pane active fade-in">
+                <!-- Toolbar for Board -->
+                <div class="board-toolbar glass-panel vertical">
+                    <button id="tool-image" class="tool-btn" title="Add Image">
+                        <span class="material-icons-round">add_photo_alternate</span>
+                        <input type="file" id="image-upload" multiple accept="image/*" class="hidden-input">
+                    </button>
+                    <button id="tool-text" class="tool-btn" title="Add Text/Label">
+                        <span class="material-icons-round">text_fields</span>
+                    </button>
+                    <button id="tool-arrow" class="tool-btn" title="Draw Arrow">
+                        <span class="material-icons-round">arrow_right_alt</span>
+                    </button>
+                    <div class="divider"></div>
+                    <button id="tool-clear" class="tool-btn danger" title="Clear Board">
+                        <span class="material-icons-round">delete_outline</span>
+                    </button>
                 </div>
-            </div>
+
+                <!-- The Infinite Canvas Workspace -->
+                <div id="workspace-canvas">
+                    <!-- Nodes (images, text) will be injected here via JS -->
+                    <canvas id="arrow-layer"></canvas>
+                </div>
+            </section>
+
+            <!-- Tab: Notes -->
+            <section id="tab-notes" class="tab-pane fade-in">
+                <div class="notes-container glass-panel">
+                    <div class="note-section full-width-note">
+                        <h3><span class="material-icons-round">edit_note</span>Shoot Notepad</h3>
+                        <textarea class="rich-textarea master-notepad" placeholder="Jot down everything you need for this shoot here! 
+
+Here are some things you might want to consider:
+
+📍 LOCATION & LOGISTICS
+- What's the address or meeting point?
+- Is there a hike involved? Parking situation?
+- Do you need a permit?
+- What time is sunset/golden hour?
+
+📸 CAMERA & GEAR
+- Which camera bodies and lenses are you bringing? (e.g., 50mm, 85mm)
+- Lighting: Speedlites, strobes, reflectors?
+- Accessories: SD Cards, extra batteries, ND filters, prism?
+
+👗 CLIENT DETAILS & VIBE
+- Who are you shooting? 
+- What are they wearing? (Flowy dress, casual, formal?)
+- Are there any insecurities or specific preferences they mentioned?
+
+📋 SHOT LIST MUST-HAVES
+1. 
+2. 
+3. "></textarea>
+                    </div>
+                </div>
+            </section>
+
         </main>
     </div>
 
-    <!-- Modal Overlay -->
-    <div id="modal-overlay" class="modal-overlay"></div>
-
-    <!-- Add/Edit Link Modal -->
-    <div id="link-modal" class="modal">
-        <div class="modal-header">
-            <h2 id="link-modal-title">Add Link</h2>
-            <button class="btn-icon btn-close-modal"><i data-lucide="x"></i></button>
+    <!-- Settings Panel (Slide-out) -->
+    <div id="settings-panel" class="settings-panel glass-panel hidden">
+        <div class="settings-header">
+            <h2><span class="material-icons-round">settings</span> Settings</h2>
+            <button id="btn-close-settings" class="btn btn-icon btn-secondary">
+                <span class="material-icons-round">close</span>
+            </button>
         </div>
-        <form id="link-form" class="modal-form">
-            <input type="hidden" id="link-id">
-            <div class="form-group">
-                <label for="link-url">URL</label>
-                <input type="url" id="link-url" placeholder="https://example.com" required autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label for="link-name">Name</label>
-                <input type="text" id="link-name" placeholder="Website Name" required autocomplete="off">
-            </div>
-            <div class="form-group">
-                <label for="link-category">Category</label>
-                <select id="link-category" required>
-                    <!-- Options injected by JS -->
+
+        <div class="settings-content">
+            <div class="input-group">
+                <label for="ai-provider">Preferred AI Provider</label>
+                <select id="ai-provider" name="ai-provider">
+                    <option value="chatgpt">ChatGPT (OpenAI)</option>
+                    <option value="gemini">Google Gemini</option>
                 </select>
             </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-close-modal">Cancel</button>
-                <button type="submit" class="btn btn-primary" id="btn-save-link">Save Link</button>
-            </div>
-        </form>
-    </div>
 
-    <!-- Add Category Modal -->
-    <div id="category-modal" class="modal">
-        <div class="modal-header">
-            <h2>New Category</h2>
-            <button class="btn-icon btn-close-modal"><i data-lucide="x"></i></button>
+            <div class="input-group">
+                <label for="chatgpt-key">OpenAI API Key</label>
+                <input type="password" id="chatgpt-key" placeholder="sk-...">
+            </div>
+
+            <div class="input-group">
+                <label for="gemini-key">Gemini API Key</label>
+                <input type="password" id="gemini-key" placeholder="AIza...">
+            </div>
+
+            <button id="btn-save-settings" class="btn btn-primary mt-4">
+                <span class="material-icons-round">save</span> Save Settings
+            </button>
         </div>
-        <form id="category-form" class="modal-form">
-            <div class="form-group">
-                <label for="category-name">Category Name</label>
-                <input type="text" id="category-name" placeholder="e.g., Work, Social, Learning" required
-                    autocomplete="off">
-            </div>
-            <div class="modal-footer">
-                <button type="button" class="btn btn-secondary btn-close-modal">Cancel</button>
-                <button type="submit" class="btn btn-primary">Create</button>
-            </div>
-        </form>
     </div>
 
+    <!-- AI Chat Panel (Slide-out) -->
+    <div id="ai-panel" class="settings-panel ai-panel glass-panel hidden">
+        <div class="settings-header">
+            <h2><span class="material-icons-round">auto_awesome</span> AI Assistant</h2>
+            <button id="btn-close-ai" class="btn btn-icon btn-secondary">
+                <span class="material-icons-round">close</span>
+            </button>
+        </div>
+
+        <div id="ai-messages" class="settings-content ai-messages">
+            <div class="message ai-message">
+                <div class="message-content">Hi! I'm your planning assistant. I have context on your photoshoot. How can
+                    I help?</div>
+            </div>
+        </div>
+
+        <div class="ai-input-area">
+            <textarea id="ai-input" placeholder="Ask about lighting, posing, or gear..." rows="2"></textarea>
+            <button id="btn-send-ai" class="btn btn-primary btn-icon">
+                <span class="material-icons-round">send</span>
+            </button>
+        </div>
+    </div>
+
+    <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="script.js"></script>
-    <script>
-        // Init Lucide icons
-        lucide.createIcons();
-    </script>
 </body>
 
 </html>
