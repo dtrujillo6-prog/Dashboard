@@ -31,6 +31,9 @@ const btnSaveSettings = document.getElementById('btn-save-settings');
 const aiProviderSelect = document.getElementById('ai-provider');
 const chatgptKeyInput = document.getElementById('chatgpt-key');
 const geminiKeyInput = document.getElementById('gemini-key');
+const googleCalendarUrlInput = document.getElementById('google-calendar-url');
+const googleCalendarIframe = document.getElementById('google-calendar-iframe');
+const calendarPlaceholder = document.getElementById('calendar-placeholder');
 
 // AI Elements
 const aiPanel = document.getElementById('ai-panel');
@@ -51,7 +54,8 @@ let appState = {
     settings: {
         aiProvider: 'chatgpt',
         chatgptKey: '',
-        geminiKey: ''
+        geminiKey: '',
+        googleCalendarUrl: ''
     }
 };
 
@@ -672,9 +676,11 @@ function handleSaveSettings() {
     appState.settings.aiProvider = aiProviderSelect.value;
     appState.settings.chatgptKey = chatgptKeyInput.value.trim();
     appState.settings.geminiKey = geminiKeyInput.value.trim();
+    appState.settings.googleCalendarUrl = googleCalendarUrlInput.value.trim();
 
     saveState();
     toggleSettingsPanel();
+    updateCalendarIframe();
 }
 
 function loadSettingsUI() {
@@ -682,6 +688,28 @@ function loadSettingsUI() {
         aiProviderSelect.value = appState.settings.aiProvider || 'chatgpt';
         chatgptKeyInput.value = appState.settings.chatgptKey || '';
         geminiKeyInput.value = appState.settings.geminiKey || '';
+        googleCalendarUrlInput.value = appState.settings.googleCalendarUrl || '';
+        updateCalendarIframe();
+    }
+}
+
+function updateCalendarIframe() {
+    const url = appState.settings.googleCalendarUrl;
+    if (url) {
+        // Try to handle both direct src urls and full iframe embed codes
+        let srcUrl = url;
+        if (url.includes('<iframe') && url.includes('src="')) {
+            const match = url.match(/src="([^"]+)"/);
+            if (match && match[1]) srcUrl = match[1];
+        }
+        
+        googleCalendarIframe.src = srcUrl;
+        googleCalendarIframe.classList.remove('hidden');
+        calendarPlaceholder.classList.add('hidden');
+    } else {
+        googleCalendarIframe.src = '';
+        googleCalendarIframe.classList.add('hidden');
+        calendarPlaceholder.classList.remove('hidden');
     }
 }
 
