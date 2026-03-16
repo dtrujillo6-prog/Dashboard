@@ -49,7 +49,21 @@
         <header class="top-nav glass-panel">
             <div class="nav-left">
                 <span class="material-icons-round logo-icon">camera</span>
-                <h2 id="project-title">My Photoshoot</h2>
+                <div class="project-title-wrapper" id="project-title-wrapper" title="Click to change shoot type">
+                    <h2 id="project-title">My Photoshoot</h2>
+                    <span class="material-icons-round" style="font-size:18px; color:var(--text-secondary); transition: transform 0.2s;" id="title-chevron">expand_more</span>
+                    <div id="shoot-type-dropdown" class="dropdown-menu glass-panel hidden" style="left:0; top:calc(100% + 8px); min-width:220px;">
+                        <div style="padding:8px 12px; font-size:0.75rem; color:var(--text-secondary); font-weight:600; letter-spacing:0.05em; text-transform:uppercase;">Change Shoot Type</div>
+                        <div class="divider" style="margin:0 0 4px; background:rgba(0,0,0,0.08);"></div>
+                        <button class="dropdown-item shoot-type-option" data-type="Senior Portraits"><span class="material-icons-round">school</span> Senior Portraits</button>
+                        <button class="dropdown-item shoot-type-option" data-type="Graduation Portraits"><span class="material-icons-round">workspace_premium</span> Graduation Portraits</button>
+                        <button class="dropdown-item shoot-type-option" data-type="Boudoir"><span class="material-icons-round">favorite</span> Boudoir</button>
+                        <button class="dropdown-item shoot-type-option" data-type="Headshots"><span class="material-icons-round">person</span> Headshots</button>
+                        <button class="dropdown-item shoot-type-option" data-type="Creative Session"><span class="material-icons-round">auto_awesome</span> Creative Session</button>
+                        <div class="divider" style="margin:4px 0; background:rgba(0,0,0,0.08);"></div>
+                        <button class="dropdown-item shoot-type-option" data-type="Custom" id="shoot-type-custom-option"><span class="material-icons-round">edit</span> Custom / Other...</button>
+                    </div>
+                </div>
             </div>
             <div class="nav-tabs">
                 <button class="tab-btn active" data-tab="board">

@@ -242,6 +242,29 @@ textarea.rich-textarea:focus {
     gap: 1rem;
 }
 
+.project-title-wrapper {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    cursor: pointer;
+    position: relative;
+    padding: 4px 8px;
+    border-radius: var(--radius-md);
+    transition: background 0.15s;
+}
+
+.project-title-wrapper:hover {
+    background: rgba(0, 0, 0, 0.07);
+}
+
+.project-title-wrapper h2 {
+    margin: 0;
+}
+
+.project-title-wrapper.open #title-chevron {
+    transform: rotate(180deg);
+}
+
 .logo-icon {
     font-size: 2rem;
     color: var(--brand-accent);

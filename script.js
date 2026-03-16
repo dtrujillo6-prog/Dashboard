@@ -43,6 +43,10 @@ const btnNewProject = document.getElementById('btn-new-project');
 const folderStatusEl = document.getElementById('folder-status');
 const projectsListEl = document.getElementById('projects-list');
 
+// Shoot Type Switcher
+const projectTitleWrapper = document.getElementById('project-title-wrapper');
+const shootTypeDropdown = document.getElementById('shoot-type-dropdown');
+
 const arrowCanvas = document.getElementById('arrow-layer');
 const arrowCtx = arrowCanvas.getContext('2d');
 
@@ -123,6 +127,22 @@ async function init() {
     btnPickFolder.addEventListener('click', pickProjectFolder);
     btnSaveProject.addEventListener('click', saveProjectToFile);
     btnNewProject.addEventListener('click', startNewProject);
+
+    // Shoot type switcher
+    projectTitleWrapper.addEventListener('click', (e) => {
+        e.stopPropagation();
+        toggleShootTypeDropdown();
+    });
+    document.querySelectorAll('.shoot-type-option').forEach(btn => {
+        btn.addEventListener('click', (e) => {
+            e.stopPropagation();
+            handleShootTypeSwitch(btn.dataset.type);
+        });
+    });
+    // Close shoot type dropdown when clicking outside
+    document.addEventListener('click', () => {
+        closeShootTypeDropdown();
+    });
 
     // Workspace events
     workspace.addEventListener('mousedown', handleWorkspaceMouseDown);
@@ -1029,6 +1049,45 @@ function startNewProject() {
     setupModal.classList.remove('hidden');
 
     toggleProjectsPanel();
+}
+
+// --- SHOOT TYPE SWITCHER --- //
+
+function toggleShootTypeDropdown() {
+    const isOpen = !shootTypeDropdown.classList.contains('hidden');
+    if (isOpen) {
+        closeShootTypeDropdown();
+    } else {
+        shootTypeDropdown.classList.remove('hidden');
+        projectTitleWrapper.classList.add('open');
+    }
+}
+
+function closeShootTypeDropdown() {
+    shootTypeDropdown.classList.add('hidden');
+    projectTitleWrapper.classList.remove('open');
+}
+
+async function handleShootTypeSwitch(type) {
+    closeShootTypeDropdown();
+
+    let newName = type;
+    if (type === 'Custom') {
+        const input = prompt('Enter a custom shoot name:', appState.projectName);
+        if (!input || !input.trim()) return; // Cancelled
+        newName = input.trim();
+    }
+
+    appState.projectName = newName;
+    projectTitle.textContent = newName;
+
+    // Highlight the active type in the dropdown
+    document.querySelectorAll('.shoot-type-option').forEach(btn => {
+        btn.style.fontWeight = btn.dataset.type === type ? '700' : '';
+        btn.style.color = btn.dataset.type === type ? 'var(--accent-color)' : '';
+    });
+
+    await saveState();
 }
 
 // Start
