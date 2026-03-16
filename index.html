@@ -63,6 +63,9 @@
                 </button>
             </div>
             <div class="nav-actions">
+                <button id="btn-projects" class="btn btn-icon btn-secondary" title="My Projects">
+                    <span class="material-icons-round">folder_open</span>
+                </button>
                 <button id="btn-settings" class="btn btn-icon btn-secondary" title="Settings">
                     <span class="material-icons-round">settings</span>
                 </button>
@@ -196,7 +199,39 @@ Here are some things you might want to consider:
         </div>
     </div>
 
+    <!-- Projects Panel (Slide-out) -->
+    <div id="projects-panel" class="settings-panel glass-panel hidden">
+        <div class="settings-header">
+            <h2><span class="material-icons-round">folder_open</span> My Projects</h2>
+            <button id="btn-close-projects" class="btn btn-icon btn-secondary">
+                <span class="material-icons-round">close</span>
+            </button>
+        </div>
+        <div class="settings-content">
+            <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:1rem;">Projects are saved as <code>.json</code> files to a folder you choose on your computer or SSD.</p>
+            <div style="display:flex; flex-direction:column; gap:0.75rem;">
+                <button id="btn-pick-folder" class="btn btn-secondary" style="width:100%; justify-content:center;">
+                    <span class="material-icons-round">drive_folder_upload</span> Choose Save Folder
+                </button>
+                <div id="folder-status" style="font-size:0.8rem; color:var(--text-secondary); text-align:center;">No folder selected</div>
+                <div class="divider" style="margin:0;"></div>
+                <button id="btn-save-project" class="btn btn-primary" style="width:100%; justify-content:center;" disabled>
+                    <span class="material-icons-round">save</span> Save Current Project
+                </button>
+                <button id="btn-new-project" class="btn btn-secondary" style="width:100%; justify-content:center;">
+                    <span class="material-icons-round">add_circle_outline</span> New Project
+                </button>
+                <div class="divider" style="margin:0;"></div>
+                <h4 style="margin:0; color:var(--text-primary); font-size:0.9rem;">Saved Projects</h4>
+                <div id="projects-list" style="display:flex; flex-direction:column; gap:0.5rem; max-height:300px; overflow-y:auto;">
+                    <div style="color:var(--text-secondary); font-size:0.85rem; text-align:center; padding:1rem;">Select a folder to see your saved projects.</div>
+                </div>
+            </div>
+        </div>
+    </div>
+
     <!-- Scripts -->
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
     <script src="script.js"></script>

@@ -33,6 +33,16 @@ const googleCalendarUrlInput = document.getElementById('google-calendar-url');
 const googleCalendarIframe = document.getElementById('google-calendar-iframe');
 const calendarPlaceholder = document.getElementById('calendar-placeholder');
 
+// Projects Panel Elements
+const projectsPanel = document.getElementById('projects-panel');
+const btnProjects = document.getElementById('btn-projects');
+const btnCloseProjects = document.getElementById('btn-close-projects');
+const btnPickFolder = document.getElementById('btn-pick-folder');
+const btnSaveProject = document.getElementById('btn-save-project');
+const btnNewProject = document.getElementById('btn-new-project');
+const folderStatusEl = document.getElementById('folder-status');
+const projectsListEl = document.getElementById('projects-list');
+
 const arrowCanvas = document.getElementById('arrow-layer');
 const arrowCtx = arrowCanvas.getContext('2d');
 
@@ -71,7 +81,7 @@ let interactionState = {
 };
 
 // --- INIT & SETUP --- //
-function init() {
+async function init() {
     resizeCanvas();
     window.addEventListener('resize', resizeCanvas);
 
@@ -107,16 +117,26 @@ function init() {
     btnCloseSettings.addEventListener('click', toggleSettingsPanel);
     btnSaveSettings.addEventListener('click', handleSaveSettings);
 
+    // Projects Panel
+    btnProjects.addEventListener('click', toggleProjectsPanel);
+    btnCloseProjects.addEventListener('click', toggleProjectsPanel);
+    btnPickFolder.addEventListener('click', pickProjectFolder);
+    btnSaveProject.addEventListener('click', saveProjectToFile);
+    btnNewProject.addEventListener('click', startNewProject);
+
     // Workspace events
     workspace.addEventListener('mousedown', handleWorkspaceMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
     window.addEventListener('mouseup', handleMouseUp);
 
-    // Load from local storage if exists
-    loadState();
+    // Load from IndexedDB (MUST await — this is why settings were resetting!)
+    await loadState();
     
-    // Attempt applying theme directly in case loadState failed
+    // Apply theme after load
     applyTheme();
+
+    // Restore last used folder handle if browser supports it
+    tryRestoreFolder();
 
     requestAnimationFrame(renderLoop);
 }
@@ -234,24 +254,25 @@ function createNodeWrapper(id, x, y, type) {
     return el;
 }
 
-function createImageNode(src, x, y) {
-    const id = generateId();
+function createImageNode(src, x, y, customId = null) {
+    const id = customId || generateId();
     const el = createNodeWrapper(id, x, y, 'image');
 
     const img = document.createElement('img');
     img.src = src;
     el.appendChild(img);
+    return el;
 }
 
-function createTextElement(content, x, y) {
-    const id = generateId();
+function createTextElement(content, x, y, customId = null) {
+    const id = customId || generateId();
     const el = createNodeWrapper(id, x, y, 'text');
 
     const textDiv = document.createElement('div');
     textDiv.className = 'node-text-content';
     textDiv.dataset.id = id;
     textDiv.contentEditable = true;
-    textDiv.textContent = content;
+    textDiv.innerHTML = content;
 
     textDiv.addEventListener('mousedown', (e) => {
         // Prevent drag if editing text
@@ -263,6 +284,7 @@ function createTextElement(content, x, y) {
     textDiv.addEventListener('input', saveStateDebounced);
 
     el.appendChild(textDiv);
+    return el;
 }
 
 // --- NODE OPERATIONS --- //
@@ -506,36 +528,74 @@ function renderLoop() {
 
 // --- PERSISTENCE --- //
 
+function serializeNodes() {
+    return appState.nodes.map(node => {
+        const type = node.classList.contains('node-image') ? 'image' : 'text';
+        
+        // Extract color class if any
+        let color = 'none';
+        ['red', 'blue', 'green', 'yellow', 'pink'].forEach(c => {
+            if (node.classList.contains(`highlight-${c}`)) {
+                color = c;
+            }
+        });
+
+        const x = parseFloat(node.style.left);
+        const y = parseFloat(node.style.top);
+
+        let content = '';
+        if (type === 'image') {
+            const img = node.querySelector('img');
+            content = img ? img.src : '';
+        } else {
+            const textDiv = node.querySelector('.node-text-content');
+            content = textDiv ? textDiv.innerHTML : '';
+        }
+
+        return {
+            id: node.id,
+            type,
+            x,
+            y,
+            color,
+            content
+        };
+    });
+}
+
 let saveTimeout = null;
 function saveStateDebounced() {
     clearTimeout(saveTimeout);
     saveTimeout = setTimeout(saveState, 1000);
 }
 
-function saveState() {
-    // For a real app, serialize DOM cleanly. 
-    // Here we will just save the project name and notes text
-    // as full DOM serialization of image b64 can exceed localstorage limits fast.
-
+async function saveState() {
     const notesData = {};
     document.querySelectorAll('.rich-textarea').forEach((ta, idx) => {
         notesData[idx] = ta.value;
     });
 
-    localStorage.setItem('photoshoot_planner_state', JSON.stringify({
+    const stateToSave = {
         projectName: appState.projectName,
         notes: notesData,
-        settings: appState.settings
-    }));
-    console.log('State saved passively.');
+        settings: appState.settings,
+        nodes: serializeNodes(),
+        arrows: appState.arrows,
+        currentId: appState.currentId
+    };
+
+    try {
+        await localforage.setItem('photoshoot_planner_state', stateToSave);
+        console.log('State saved passively to IndexedDB.');
+    } catch (e) {
+        console.error('Failed to save state to indexedDB:', e);
+    }
 }
 
-function loadState() {
-    const saved = localStorage.getItem('photoshoot_planner_state');
-    if (saved) {
-        try {
-            const data = JSON.parse(saved);
-
+async function loadState() {
+    try {
+        const data = await localforage.getItem('photoshoot_planner_state');
+        if (data) {
             // Restore modal state if already setup
             if (data.projectName && data.projectName !== 'Untitled Shoot') {
                 appState.projectName = data.projectName;
@@ -562,9 +622,34 @@ function loadState() {
                 loadSettingsUI();
             }
 
-        } catch (e) {
-            console.error('Failed to load state', e);
+            // Restore Nodes
+            if (data.currentId) {
+                appState.currentId = data.currentId;
+            }
+
+            if (data.nodes && Array.isArray(data.nodes)) {
+                data.nodes.forEach(nodeData => {
+                    let el;
+                    if (nodeData.type === 'image') {
+                        el = createImageNode(nodeData.content, nodeData.x, nodeData.y, nodeData.id);
+                    } else if (nodeData.type === 'text') {
+                        el = createTextElement(nodeData.content, nodeData.x, nodeData.y, nodeData.id);
+                    }
+                    
+                    if (el && nodeData.color && nodeData.color !== 'none') {
+                        el.classList.add(`highlight-${nodeData.color}`);
+                    }
+                });
+            }
+
+            // Restore arrows
+            if (data.arrows && Array.isArray(data.arrows)) {
+                appState.arrows = data.arrows;
+                setTimeout(resizeCanvas, 0);
+            }
         }
+    } catch (e) {
+        console.error('Failed to load state from IndexedDB', e);
     }
 }
 
@@ -723,6 +808,227 @@ function updateCalendarIframe() {
         googleCalendarIframe.classList.add('hidden');
         calendarPlaceholder.classList.remove('hidden');
     }
+}
+
+// --- PROJECT MANAGER (File System Access API) --- //
+
+let projectFolderHandle = null; // FileSystemDirectoryHandle
+
+function toggleProjectsPanel() {
+    if (projectsPanel.classList.contains('hidden')) {
+        projectsPanel.classList.remove('hidden');
+        setTimeout(() => projectsPanel.classList.add('open'), 10);
+    } else {
+        projectsPanel.classList.remove('open');
+        setTimeout(() => projectsPanel.classList.add('hidden'), 400);
+    }
+}
+
+async function tryRestoreFolder() {
+    // Try to restore the folder handle from IndexedDB
+    try {
+        const handle = await localforage.getItem('photoshoot_folder_handle');
+        if (handle) {
+            // Verify we still have permission
+            const perm = await handle.queryPermission({ mode: 'readwrite' });
+            if (perm === 'granted') {
+                projectFolderHandle = handle;
+                folderStatusEl.textContent = `📁 Folder: ${handle.name}`;
+                btnSaveProject.disabled = false;
+                await refreshProjectsList();
+            }
+        }
+    } catch (e) {
+        console.log('No previously stored folder handle or permission revoked.');
+    }
+}
+
+async function pickProjectFolder() {
+    if (!('showDirectoryPicker' in window)) {
+        alert('Your browser does not support the File System Access API. Please use Chrome or Edge.');
+        return;
+    }
+    try {
+        const handle = await window.showDirectoryPicker({ mode: 'readwrite' });
+        projectFolderHandle = handle;
+
+        // Persist for next session
+        await localforage.setItem('photoshoot_folder_handle', handle);
+
+        folderStatusEl.textContent = `📁 Folder: ${handle.name}`;
+        btnSaveProject.disabled = false;
+        await refreshProjectsList();
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            console.error('Error picking folder:', e);
+        }
+    }
+}
+
+async function saveProjectToFile() {
+    if (!projectFolderHandle) {
+        alert('Please choose a save folder first.');
+        return;
+    }
+
+    // Use the current project name as the filename
+    const rawName = appState.projectName || 'Untitled Shoot';
+    const fileName = rawName.replace(/[^a-z0-9_\-\s]/gi, '_') + '.json';
+
+    try {
+        const notesData = {};
+        document.querySelectorAll('.rich-textarea').forEach((ta, idx) => {
+            notesData[idx] = ta.value;
+        });
+
+        const projectData = {
+            version: 1,
+            savedAt: new Date().toISOString(),
+            projectName: appState.projectName,
+            notes: notesData,
+            settings: appState.settings,
+            nodes: serializeNodes(),
+            arrows: appState.arrows,
+            currentId: appState.currentId
+        };
+
+        const fileHandle = await projectFolderHandle.getFileHandle(fileName, { create: true });
+        const writable = await fileHandle.createWritable();
+        await writable.write(JSON.stringify(projectData, null, 2));
+        await writable.close();
+
+        folderStatusEl.textContent = `✅ Saved: ${fileName}`;
+        setTimeout(() => { folderStatusEl.textContent = `📁 Folder: ${projectFolderHandle.name}`; }, 3000);
+
+        await refreshProjectsList();
+    } catch (e) {
+        console.error('Error saving project:', e);
+        alert('Failed to save project: ' + e.message);
+    }
+}
+
+async function refreshProjectsList() {
+    if (!projectFolderHandle) return;
+
+    projectsListEl.innerHTML = '';
+    const projects = [];
+
+    for await (const [name, handle] of projectFolderHandle.entries()) {
+        if (handle.kind === 'file' && name.endsWith('.json')) {
+            projects.push({ name, handle });
+        }
+    }
+
+    if (projects.length === 0) {
+        projectsListEl.innerHTML = '<div style="color:var(--text-secondary); font-size:0.85rem; text-align:center; padding:1rem;">No saved projects yet. Save your current project to get started!</div>';
+        return;
+    }
+
+    // Sort alphabetically
+    projects.sort((a, b) => a.name.localeCompare(b.name));
+
+    projects.forEach(({ name, handle }) => {
+        const item = document.createElement('div');
+        item.style.cssText = 'display:flex; align-items:center; gap:0.5rem; padding:0.6rem 0.75rem; background:rgba(0,0,0,0.05); border-radius:8px; cursor:pointer;';
+        item.innerHTML = `
+            <span class="material-icons-round" style="font-size:18px; color:var(--accent-color);">description</span>
+            <span style="flex:1; font-size:0.85rem; color:var(--text-primary); overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">${name.replace('.json', '')}</span>
+            <button class="btn btn-icon btn-secondary" style="padding:4px; min-width:auto;" title="Load Project">
+                <span class="material-icons-round" style="font-size:16px;">folder_open</span>
+            </button>
+        `;
+
+        item.querySelector('button').addEventListener('click', (e) => {
+            e.stopPropagation();
+            loadProjectFromFile(handle);
+        });
+        item.addEventListener('click', () => loadProjectFromFile(handle));
+
+        projectsListEl.appendChild(item);
+    });
+}
+
+async function loadProjectFromFile(fileHandle) {
+    try {
+        const file = await fileHandle.getFile();
+        const text = await file.text();
+        const data = JSON.parse(text);
+
+        if (!confirm(`Load project "${data.projectName}"? Unsaved changes to the current project will be lost.`)) return;
+
+        // Clear the current board
+        appState.nodes.forEach(n => n.remove());
+        appState.nodes = [];
+        appState.arrows = [];
+
+        // Restore project 
+        appState.projectName = data.projectName;
+        projectTitle.textContent = data.projectName;
+        setupModal.classList.add('hidden');
+        appContainer.classList.remove('hidden');
+
+        if (data.currentId) appState.currentId = data.currentId;
+
+        if (data.notes) {
+            document.querySelectorAll('.rich-textarea').forEach((ta, idx) => {
+                ta.value = data.notes[idx] || '';
+            });
+        }
+
+        if (data.settings) {
+            appState.settings = data.settings;
+            loadSettingsUI();
+        }
+
+        if (data.nodes && Array.isArray(data.nodes)) {
+            data.nodes.forEach(nodeData => {
+                let el;
+                if (nodeData.type === 'image') {
+                    el = createImageNode(nodeData.content, nodeData.x, nodeData.y, nodeData.id);
+                } else if (nodeData.type === 'text') {
+                    el = createTextElement(nodeData.content, nodeData.x, nodeData.y, nodeData.id);
+                }
+                if (el && nodeData.color && nodeData.color !== 'none') {
+                    el.classList.add(`highlight-${nodeData.color}`);
+                }
+            });
+        }
+
+        if (data.arrows && Array.isArray(data.arrows)) {
+            appState.arrows = data.arrows;
+        }
+
+        setTimeout(resizeCanvas, 0);
+        toggleProjectsPanel();
+
+        folderStatusEl.textContent = `✅ Loaded: ${data.projectName}`;
+        setTimeout(() => { folderStatusEl.textContent = `📁 Folder: ${projectFolderHandle.name}`; }, 3000);
+
+    } catch (e) {
+        console.error('Error loading project:', e);
+        alert('Failed to load project: ' + e.message);
+    }
+}
+
+function startNewProject() {
+    if (!confirm('Start a new project? Unsaved changes to the current project will be lost.')) return;
+
+    // Clear board
+    appState.nodes.forEach(n => n.remove());
+    appState.nodes = [];
+    appState.arrows = [];
+    appState.currentId = 0;
+    appState.projectName = 'Untitled Shoot';
+    projectTitle.textContent = 'Untitled Shoot';
+
+    // Clear notes
+    document.querySelectorAll('.rich-textarea').forEach(ta => { ta.value = ''; });
+
+    // Show setup modal again
+    appContainer.classList.add('hidden');
+    setupModal.classList.remove('hidden');
+
+    toggleProjectsPanel();
 }
 
 // Start
