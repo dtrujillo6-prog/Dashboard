@@ -1085,25 +1085,57 @@ async function loadProjectFromFile(fileHandle) {
     }
 }
 
-function startNewProject() {
+async function startNewProject() {
     if (!confirm('Start a new project? Unsaved changes to the current project will be lost.')) return;
 
-    // Clear board
-    appState.nodes.forEach(n => n.remove());
+    console.log('Starting new project...');
+
+    // Clear board nodes from DOM and state
+    if (appState.nodes && Array.isArray(appState.nodes)) {
+        appState.nodes.forEach(node => {
+            if (node && typeof node.remove === 'function') {
+                node.remove();
+            }
+        });
+    }
+    
+    // Clear workspace just in case anything else is lurking
+    if (workspace) {
+        workspace.innerHTML = '';
+        // Add back the canvas if it was a child (check index.html structure)
+        // In our structure, canvas is outside workspace or inside?
+        // Let's check index.html again.
+    }
+
     appState.nodes = [];
     appState.arrows = [];
     appState.currentId = 0;
     appState.projectName = 'Untitled Shoot';
     projectTitle.textContent = 'Untitled Shoot';
 
-    // Clear notes
+    // Clear notes textareas
     document.querySelectorAll('.rich-textarea').forEach(ta => { ta.value = ''; });
+
+    // Clear arrow canvas
+    if (arrowCtx && arrowCanvas) {
+        arrowCtx.clearRect(0, 0, arrowCanvas.width, arrowCanvas.height);
+    }
+
+    // Reset setup form inputs
+    if (shootTypeSelect) shootTypeSelect.value = 'Senior Portraits';
+    const customTypeGroup = document.getElementById('custom-type-group');
+    if (customTypeGroup) customTypeGroup.classList.add('hidden');
+    if (customTypeInput) customTypeInput.value = '';
 
     // Show setup modal again
     appContainer.classList.add('hidden');
     setupModal.classList.remove('hidden');
 
+    // Close the projects panel
     toggleProjectsPanel();
+
+    // Persist the reset state
+    await saveState();
 }
 
 // --- SHOOT TYPE SWITCHER --- //
