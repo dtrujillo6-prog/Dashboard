@@ -229,6 +229,9 @@ Here are some things you might want to consider:
                 </button>
                 <div id="folder-status" style="font-size:0.8rem; color:var(--text-secondary); text-align:center;">No folder selected</div>
                 <div class="divider" style="margin:0;"></div>
+                <button id="btn-open-file" class="btn btn-secondary" style="width:100%; justify-content:center;">
+                    <span class="material-icons-round">file_open</span> Open a Saved Project File
+                </button>
                 <button id="btn-save-project" class="btn btn-primary" style="width:100%; justify-content:center;" disabled>
                     <span class="material-icons-round">save</span> Save Current Project
                 </button>
@@ -236,7 +239,12 @@ Here are some things you might want to consider:
                     <span class="material-icons-round">add_circle_outline</span> New Project
                 </button>
                 <div class="divider" style="margin:0;"></div>
-                <h4 style="margin:0; color:var(--text-primary); font-size:0.9rem;">Saved Projects</h4>
+                <div style="display:flex; align-items:center; justify-content:space-between;">
+                    <h4 style="margin:0; color:var(--text-primary); font-size:0.9rem;">Saved Projects</h4>
+                    <button id="btn-grant-access" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px; display:none;">
+                        <span class="material-icons-round" style="font-size:14px;">lock_open</span> Grant Access
+                    </button>
+                </div>
                 <div id="projects-list" style="display:flex; flex-direction:column; gap:0.5rem; max-height:300px; overflow-y:auto;">
                     <div style="color:var(--text-secondary); font-size:0.85rem; text-align:center; padding:1rem;">Select a folder to see your saved projects.</div>
                 </div>

@@ -38,8 +38,10 @@ const projectsPanel = document.getElementById('projects-panel');
 const btnProjects = document.getElementById('btn-projects');
 const btnCloseProjects = document.getElementById('btn-close-projects');
 const btnPickFolder = document.getElementById('btn-pick-folder');
+const btnOpenFile = document.getElementById('btn-open-file');
 const btnSaveProject = document.getElementById('btn-save-project');
 const btnNewProject = document.getElementById('btn-new-project');
+const btnGrantAccess = document.getElementById('btn-grant-access');
 const folderStatusEl = document.getElementById('folder-status');
 const projectsListEl = document.getElementById('projects-list');
 
@@ -125,8 +127,10 @@ async function init() {
     btnProjects.addEventListener('click', toggleProjectsPanel);
     btnCloseProjects.addEventListener('click', toggleProjectsPanel);
     btnPickFolder.addEventListener('click', pickProjectFolder);
+    btnOpenFile.addEventListener('click', openProjectFilePicker);
     btnSaveProject.addEventListener('click', saveProjectToFile);
     btnNewProject.addEventListener('click', startNewProject);
+    btnGrantAccess.addEventListener('click', grantFolderAccess);
 
     // Shoot type switcher
     projectTitleWrapper.addEventListener('click', (e) => {
@@ -849,17 +853,37 @@ async function tryRestoreFolder() {
     try {
         const handle = await localforage.getItem('photoshoot_folder_handle');
         if (handle) {
+            projectFolderHandle = handle;
             // Verify we still have permission
             const perm = await handle.queryPermission({ mode: 'readwrite' });
             if (perm === 'granted') {
-                projectFolderHandle = handle;
                 folderStatusEl.textContent = `📁 Folder: ${handle.name}`;
                 btnSaveProject.disabled = false;
+                btnGrantAccess.style.display = 'none';
                 await refreshProjectsList();
+            } else {
+                folderStatusEl.textContent = `🔒 Access Required: ${handle.name}`;
+                btnGrantAccess.style.display = 'flex';
+                btnSaveProject.disabled = true;
             }
         }
     } catch (e) {
         console.log('No previously stored folder handle or permission revoked.');
+    }
+}
+
+async function grantFolderAccess() {
+    if (!projectFolderHandle) return;
+    try {
+        const perm = await projectFolderHandle.requestPermission({ mode: 'readwrite' });
+        if (perm === 'granted') {
+            btnGrantAccess.style.display = 'none';
+            btnSaveProject.disabled = false;
+            folderStatusEl.textContent = `📁 Folder: ${projectFolderHandle.name}`;
+            await refreshProjectsList();
+        }
+    } catch (e) {
+        console.error('Failed to get permission:', e);
     }
 }
 
@@ -877,10 +901,34 @@ async function pickProjectFolder() {
 
         folderStatusEl.textContent = `📁 Folder: ${handle.name}`;
         btnSaveProject.disabled = false;
+        btnGrantAccess.style.display = 'none';
         await refreshProjectsList();
     } catch (e) {
         if (e.name !== 'AbortError') {
             console.error('Error picking folder:', e);
+        }
+    }
+}
+
+async function openProjectFilePicker() {
+    if (!('showOpenFilePicker' in window)) {
+        alert('Your browser does not support the File System Access API. Please use Chrome or Edge.');
+        return;
+    }
+    try {
+        const [handle] = await window.showOpenFilePicker({
+            types: [{
+                description: 'Photoshoot Project',
+                accept: { 'application/json': ['.json'] }
+            }],
+            multiple: false
+        });
+        if (handle) {
+            await loadProjectFromFile(handle);
+        }
+    } catch (e) {
+        if (e.name !== 'AbortError') {
+            console.error('Error opening file:', e);
         }
     }
 }
@@ -933,10 +981,17 @@ async function refreshProjectsList() {
     projectsListEl.innerHTML = '';
     const projects = [];
 
-    for await (const [name, handle] of projectFolderHandle.entries()) {
-        if (handle.kind === 'file' && name.endsWith('.json')) {
-            projects.push({ name, handle });
+    try {
+        for await (const [name, handle] of projectFolderHandle.entries()) {
+            if (handle.kind === 'file' && name.endsWith('.json')) {
+                projects.push({ name, handle });
+            }
         }
+    } catch (e) {
+        console.error('Error reading directory entries:', e);
+        projectsListEl.innerHTML = '<div style="color:#ef4444; font-size:0.85rem; text-align:center; padding:1rem;">Access denied. Click "Grant Access" above.</div>';
+        btnGrantAccess.style.display = 'flex';
+        return;
     }
 
     if (projects.length === 0) {
