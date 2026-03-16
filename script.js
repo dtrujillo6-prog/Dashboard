@@ -22,26 +22,16 @@ const exportDropdown = document.getElementById('export-dropdown');
 const exportPng = document.getElementById('export-png');
 const exportPdf = document.getElementById('export-pdf');
 const exportEmail = document.getElementById('export-email');
-const btnAi = document.getElementById('btn-ai');
 
 // Settings Elements
 const settingsPanel = document.getElementById('settings-panel');
 const btnSettings = document.getElementById('btn-settings');
 const btnCloseSettings = document.getElementById('btn-close-settings');
 const btnSaveSettings = document.getElementById('btn-save-settings');
-const aiProviderSelect = document.getElementById('ai-provider');
-const chatgptKeyInput = document.getElementById('chatgpt-key');
-const geminiKeyInput = document.getElementById('gemini-key');
+const appThemeSelect = document.getElementById('app-theme');
 const googleCalendarUrlInput = document.getElementById('google-calendar-url');
 const googleCalendarIframe = document.getElementById('google-calendar-iframe');
 const calendarPlaceholder = document.getElementById('calendar-placeholder');
-
-// AI Elements
-const aiPanel = document.getElementById('ai-panel');
-const btnCloseAi = document.getElementById('btn-close-ai');
-const aiMessagesContainer = document.getElementById('ai-messages');
-const aiInput = document.getElementById('ai-input');
-const btnSendAi = document.getElementById('btn-send-ai');
 
 const arrowCanvas = document.getElementById('arrow-layer');
 const arrowCtx = arrowCanvas.getContext('2d');
@@ -53,9 +43,7 @@ let appState = {
     arrows: [],     // Array of {fromId, toId}
     currentId: 0,
     settings: {
-        aiProvider: 'chatgpt',
-        chatgptKey: '',
-        geminiKey: '',
+        theme: 'light',
         googleCalendarUrl: ''
     }
 };
@@ -119,17 +107,6 @@ function init() {
     btnCloseSettings.addEventListener('click', toggleSettingsPanel);
     btnSaveSettings.addEventListener('click', handleSaveSettings);
 
-    // AI
-    btnAi.addEventListener('click', toggleAiPanel);
-    btnCloseAi.addEventListener('click', toggleAiPanel);
-    btnSendAi.addEventListener('click', handleSendAiMessage);
-    aiInput.addEventListener('keydown', (e) => {
-        if (e.key === 'Enter' && !e.shiftKey) {
-            e.preventDefault();
-            handleSendAiMessage();
-        }
-    });
-
     // Workspace events
     workspace.addEventListener('mousedown', handleWorkspaceMouseDown);
     window.addEventListener('mousemove', handleMouseMove);
@@ -137,6 +114,9 @@ function init() {
 
     // Load from local storage if exists
     loadState();
+    
+    // Attempt applying theme directly in case loadState failed
+    applyTheme();
 
     requestAnimationFrame(renderLoop);
 }
@@ -702,24 +682,27 @@ function toggleSettingsPanel() {
 }
 
 function handleSaveSettings() {
-    appState.settings.aiProvider = aiProviderSelect.value;
-    appState.settings.chatgptKey = chatgptKeyInput.value.trim();
-    appState.settings.geminiKey = geminiKeyInput.value.trim();
+    appState.settings.theme = appThemeSelect.value;
     appState.settings.googleCalendarUrl = googleCalendarUrlInput.value.trim();
 
     saveState();
     toggleSettingsPanel();
     updateCalendarIframe();
+    applyTheme();
 }
 
 function loadSettingsUI() {
     if (appState.settings) {
-        aiProviderSelect.value = appState.settings.aiProvider || 'chatgpt';
-        chatgptKeyInput.value = appState.settings.chatgptKey || '';
-        geminiKeyInput.value = appState.settings.geminiKey || '';
         googleCalendarUrlInput.value = appState.settings.googleCalendarUrl || '';
+        appThemeSelect.value = appState.settings.theme || 'light';
         updateCalendarIframe();
+        applyTheme();
     }
+}
+
+function applyTheme() {
+    const theme = appState.settings.theme || 'light';
+    document.documentElement.setAttribute('data-theme', theme);
 }
 
 function updateCalendarIframe() {
@@ -740,162 +723,6 @@ function updateCalendarIframe() {
         googleCalendarIframe.classList.add('hidden');
         calendarPlaceholder.classList.remove('hidden');
     }
-}
-
-// --- AI ASSISTANT --- //
-function toggleAiPanel() {
-    if (aiPanel.classList.contains('hidden')) {
-        aiPanel.classList.remove('hidden');
-        setTimeout(() => {
-            aiPanel.classList.add('open');
-            aiInput.focus();
-        }, 10);
-    } else {
-        aiPanel.classList.remove('open');
-        setTimeout(() => {
-            aiPanel.classList.add('hidden');
-        }, 400);
-    }
-}
-
-function getShootContext() {
-    // Gather all text from the notes to serve as context
-    let contextStr = `Role: You are an expert photoshoot planning assistant.\n`;
-    contextStr += `Project Name: ${appState.projectName}\n\n`;
-    contextStr += `Photographer's Current Notes:\n`;
-
-    document.querySelectorAll('.rich-textarea').forEach(ta => {
-        if (ta.value.trim().length > 0) {
-            contextStr += `---\n${ta.value}\n---\n`;
-        }
-    });
-    return contextStr;
-}
-
-function appendAiMessage(text, isUser = false) {
-    const msgDiv = document.createElement('div');
-    msgDiv.className = `message ${isUser ? 'user-message' : 'ai-message'}`;
-
-    const contentDiv = document.createElement('div');
-    contentDiv.className = 'message-content';
-    // Basic text formatting (could add a simple markdown parser here later if desired)
-    contentDiv.innerText = text;
-
-    msgDiv.appendChild(contentDiv);
-    aiMessagesContainer.appendChild(msgDiv);
-
-    // Scroll to bottom
-    aiMessagesContainer.scrollTop = aiMessagesContainer.scrollHeight;
-}
-
-function showLoadingIndicator() {
-    const loadingDiv = document.createElement('div');
-    loadingDiv.className = 'message ai-message loading-indicator';
-    loadingDiv.id = 'ai-loading';
-    loadingDiv.innerHTML = `
-        <div class="message-content">
-            <div class="typing-indicator"><span></span><span></span><span></span></div>
-        </div>
-    `;
-    aiMessagesContainer.appendChild(loadingDiv);
-    aiMessagesContainer.scrollTop = aiMessagesContainer.scrollHeight;
-}
-
-function hideLoadingIndicator() {
-    const loader = document.getElementById('ai-loading');
-    if (loader) loader.remove();
-}
-
-async function handleSendAiMessage() {
-    const text = aiInput.value.trim();
-    if (!text) return;
-
-    const provider = appState.settings.aiProvider;
-    const apiKey = provider === 'chatgpt' ? appState.settings.chatgptKey : appState.settings.geminiKey;
-
-    if (!apiKey) {
-        alert(`Please open settings and enter your API Key for ${provider === 'chatgpt' ? 'ChatGPT' : 'Gemini'}.`);
-        return;
-    }
-
-    aiInput.value = '';
-    appendAiMessage(text, true);
-    showLoadingIndicator();
-
-    const systemContext = getShootContext();
-
-    try {
-        let responseText = '';
-
-        if (provider === 'chatgpt') {
-            responseText = await callOpenAI(apiKey, systemContext, text);
-        } else {
-            responseText = await callGemini(apiKey, systemContext, text);
-        }
-
-        hideLoadingIndicator();
-        appendAiMessage(responseText, false);
-
-    } catch (error) {
-        hideLoadingIndicator();
-        console.error("AI Error:", error);
-        appendAiMessage(`Error connecting to AI: ${error.message}. Please check your API key and connection.`);
-    }
-}
-
-// Minimal OpenAI / Gemini Fetch implementations
-async function callOpenAI(apiKey, systemContext, userPrompt) {
-    const res = await fetch('https://api.openai.com/v1/chat/completions', {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json',
-            'Authorization': `Bearer ${apiKey}`
-        },
-        body: JSON.stringify({
-            model: "gpt-3.5-turbo",
-            messages: [
-                { role: "system", content: systemContext },
-                { role: "user", content: userPrompt }
-            ]
-        })
-    });
-
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error?.message || res.statusText);
-    }
-
-    const data = await res.json();
-    return data.choices[0].message.content;
-}
-
-async function callGemini(apiKey, systemContext, userPrompt) {
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/gemini-1.5-flash:generateContent?key=${apiKey}`;
-
-    // Note: Gemini doesn't have a strict "system" role in the basic generateContent API format we easily use with fetch, 
-    // so we combine it into the user prompt or use the system_instruction field (newer).
-    // Let's combine them into a single string for simplicity here.
-    const combinedPrompt = `${systemContext}\n\nUser Question:\n${userPrompt}`;
-
-    const res = await fetch(url, {
-        method: 'POST',
-        headers: {
-            'Content-Type': 'application/json'
-        },
-        body: JSON.stringify({
-            contents: [{
-                parts: [{ text: combinedPrompt }]
-            }]
-        })
-    });
-
-    if (!res.ok) {
-        const err = await res.json();
-        throw new Error(err.error?.message || res.statusText);
-    }
-
-    const data = await res.json();
-    return data.candidates[0].content.parts[0].text;
 }
 
 // Start

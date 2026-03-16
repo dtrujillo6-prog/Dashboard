@@ -63,9 +63,6 @@
                 </button>
             </div>
             <div class="nav-actions">
-                <button id="btn-ai" class="btn btn-icon btn-secondary" title="AI Assistant">
-                    <span class="material-icons-round">auto_awesome</span>
-                </button>
                 <button id="btn-settings" class="btn btn-icon btn-secondary" title="Settings">
                     <span class="material-icons-round">settings</span>
                 </button>
@@ -180,21 +177,11 @@ Here are some things you might want to consider:
 
         <div class="settings-content">
             <div class="input-group">
-                <label for="ai-provider">Preferred AI Provider</label>
-                <select id="ai-provider" name="ai-provider">
-                    <option value="chatgpt">ChatGPT (OpenAI)</option>
-                    <option value="gemini">Google Gemini</option>
+                <label for="app-theme">App Theme</label>
+                <select id="app-theme" name="app-theme">
+                    <option value="light">Light Mode</option>
+                    <option value="dark">Dark Mode</option>
                 </select>
-            </div>
-
-            <div class="input-group">
-                <label for="chatgpt-key">OpenAI API Key</label>
-                <input type="password" id="chatgpt-key" placeholder="sk-...">
-            </div>
-
-            <div class="input-group">
-                <label for="gemini-key">Gemini API Key</label>
-                <input type="password" id="gemini-key" placeholder="AIza...">
             </div>
 
             <div class="input-group">
@@ -205,30 +192,6 @@ Here are some things you might want to consider:
 
             <button id="btn-save-settings" class="btn btn-primary mt-4">
                 <span class="material-icons-round">save</span> Save Settings
-            </button>
-        </div>
-    </div>
-
-    <!-- AI Chat Panel (Slide-out) -->
-    <div id="ai-panel" class="settings-panel ai-panel glass-panel hidden">
-        <div class="settings-header">
-            <h2><span class="material-icons-round">auto_awesome</span> AI Assistant</h2>
-            <button id="btn-close-ai" class="btn btn-icon btn-secondary">
-                <span class="material-icons-round">close</span>
-            </button>
-        </div>
-
-        <div id="ai-messages" class="settings-content ai-messages">
-            <div class="message ai-message">
-                <div class="message-content">Hi! I'm your planning assistant. I have context on your photoshoot. How can
-                    I help?</div>
-            </div>
-        </div>
-
-        <div class="ai-input-area">
-            <textarea id="ai-input" placeholder="Ask about lighting, posing, or gear..." rows="2"></textarea>
-            <button id="btn-send-ai" class="btn btn-primary btn-icon">
-                <span class="material-icons-round">send</span>
             </button>
         </div>
     </div>
