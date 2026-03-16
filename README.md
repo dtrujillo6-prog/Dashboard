@@ -1,5 +1,5 @@
 # Photoshoot Planner
-#### Video Demo: <URL HERE>
+#### Video Demo: <https://youtu.be/kFomkZ0h9a8>
 #### Description:
 My Photoshoot Planner is a project inspired by my professional need to constantly build mood boards for photoshoots.
 The idea here is to take a tool that I use frequently like Milanote and remove all the bloat tools that I dont need to do my job.
