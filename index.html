@@ -5,254 +5,328 @@
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Photoshoot Planner</title>
-    <link rel="stylesheet" href="style.css">
-    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap" rel="stylesheet">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link
+        href="https://fonts.googleapis.com/css2?family=Fraunces:opsz,wght@9..144,600;9..144,700&family=Manrope:wght@400;500;600;700;800&display=swap"
+        rel="stylesheet">
     <link href="https://fonts.googleapis.com/icon?family=Material+Icons+Round" rel="stylesheet">
+    <link rel="stylesheet" href="style.css">
 </head>
 
 <body>
+    <div class="app-shell">
+        <div id="setup-modal" class="modal-overlay">
+            <div class="modal-content glass-panel">
+                <p class="eyebrow">Photoshoot Planner</p>
+                <h1>Build a shoot plan that feels calm and clear.</h1>
+                <p class="subtitle">Start with a session type and we will prep the board, notes, and calendar workspace for you.</p>
 
-    <!-- Onboarding / Setup Modal -->
-    <div id="setup-modal" class="modal-overlay">
-        <div class="modal-content glass-panel">
-            <h1>Start Planning</h1>
-            <p class="subtitle">Select your photoshoot type to begin</p>
+                <form id="setup-form">
+                    <div class="input-group">
+                        <label for="shoot-type">Session Type</label>
+                        <select id="shoot-type" name="shoot-type">
+                            <option value="Senior Portraits">Senior Portraits</option>
+                            <option value="Graduation Portraits">Graduation Portraits</option>
+                            <option value="Boudoir">Boudoir</option>
+                            <option value="Headshots">Headshots</option>
+                            <option value="Creative Session">Creative Session</option>
+                            <option value="Custom">Custom / Other...</option>
+                        </select>
+                    </div>
 
-            <form id="setup-form">
-                <div class="input-group">
-                    <label for="shoot-type">Photoshoot Type</label>
-                    <select id="shoot-type" name="shoot-type">
-                        <option value="Senior Portraits">Senior Portraits</option>
-                        <option value="Graduation Portraits">Graduation Portraits</option>
-                        <option value="Boudoir">Boudoir</option>
-                        <option value="Headshots">Headshots</option>
-                        <option value="Creative Session">Creative Session</option>
-                        <option value="Custom">Custom / Other...</option>
-                    </select>
-                </div>
+                    <div class="input-group hidden" id="custom-type-group">
+                        <label for="custom-type">Custom Session Name</label>
+                        <input type="text" id="custom-type" placeholder="e.g., Joshua Tree Editorial">
+                    </div>
 
-                <div class="input-group hidden" id="custom-type-group">
-                    <label for="custom-type">Custom Shoot Name</label>
-                    <input type="text" id="custom-type" placeholder="e.g., Elopement in the Woods">
-                </div>
-
-                <button type="submit" class="btn btn-primary mt-4">Create Project<span
-                        class="material-icons-round">arrow_forward</span></button>
-            </form>
+                    <button type="submit" class="btn btn-primary">
+                        <span>Create Workspace</span>
+                        <span class="material-icons-round">arrow_forward</span>
+                    </button>
+                </form>
+            </div>
         </div>
-    </div>
 
-    <!-- Main Application UI (Hidden Initially) -->
-    <div id="app-container" class="app-layout hidden">
-
-        <!-- Top Navigation -->
-        <header class="top-nav glass-panel">
-            <div class="nav-left">
-                <span class="material-icons-round logo-icon">camera</span>
-                <div class="project-title-wrapper" id="project-title-wrapper" title="Click to change shoot type">
-                    <h2 id="project-title">My Photoshoot</h2>
-                    <span class="material-icons-round" style="font-size:18px; color:var(--text-secondary); transition: transform 0.2s;" id="title-chevron">expand_more</span>
-                    <div id="shoot-type-dropdown" class="dropdown-menu glass-panel hidden" style="left:0; top:calc(100% + 8px); min-width:220px;">
-                        <div style="padding:8px 12px; font-size:0.75rem; color:var(--text-secondary); font-weight:600; letter-spacing:0.05em; text-transform:uppercase;">Change Shoot Type</div>
-                        <div class="divider" style="margin:0 0 4px; background:rgba(0,0,0,0.08);"></div>
-                        <button class="dropdown-item shoot-type-option" data-type="Senior Portraits"><span class="material-icons-round">school</span> Senior Portraits</button>
-                        <button class="dropdown-item shoot-type-option" data-type="Graduation Portraits"><span class="material-icons-round">workspace_premium</span> Graduation Portraits</button>
-                        <button class="dropdown-item shoot-type-option" data-type="Boudoir"><span class="material-icons-round">favorite</span> Boudoir</button>
-                        <button class="dropdown-item shoot-type-option" data-type="Headshots"><span class="material-icons-round">person</span> Headshots</button>
-                        <button class="dropdown-item shoot-type-option" data-type="Creative Session"><span class="material-icons-round">auto_awesome</span> Creative Session</button>
-                        <div class="divider" style="margin:4px 0; background:rgba(0,0,0,0.08);"></div>
-                        <button class="dropdown-item shoot-type-option" data-type="Custom" id="shoot-type-custom-option"><span class="material-icons-round">edit</span> Custom / Other...</button>
-                    </div>
-                </div>
-            </div>
-            <div class="nav-tabs">
-                <button class="tab-btn active" data-tab="board">
-                    <span class="material-icons-round">dashboard</span>Board
-                </button>
-                <button class="tab-btn" data-tab="notes">
-                    <span class="material-icons-round">description</span>Notes
-                </button>
-                <button class="tab-btn" data-tab="calendar">
-                    <span class="material-icons-round">calendar_today</span>Calendar
-                </button>
-            </div>
-            <div class="nav-actions">
-                <button id="btn-projects" class="btn btn-icon btn-secondary" title="My Projects">
-                    <span class="material-icons-round">folder_open</span>
-                </button>
-                <button id="btn-settings" class="btn btn-icon btn-secondary" title="Settings">
-                    <span class="material-icons-round">settings</span>
-                </button>
-                <div class="dropdown-container">
-                    <button id="btn-export-toggle" class="btn btn-primary">
-                        <span class="material-icons-round">ios_share</span>Export
-                    </button>
-                    <div id="export-dropdown" class="dropdown-menu hidden glass-panel">
-                        <button class="dropdown-item" id="export-png">
-                            <span class="material-icons-round">image</span> Export as PNG
-                        </button>
-                        <button class="dropdown-item" id="export-pdf">
-                            <span class="material-icons-round">picture_as_pdf</span> Export as PDF
-                        </button>
-                        <div class="divider" style="margin:0; background:rgba(0,0,0,0.1)"></div>
-                        <button class="dropdown-item" id="export-email">
-                            <span class="material-icons-round">email</span> Send via Email
-                        </button>
-                    </div>
-                </div>
-            </div>
-        </header>
-
-        <!-- Main Content Area -->
-        <main class="content-area">
-
-            <!-- Tab: Mood Board -->
-            <section id="tab-board" class="tab-pane active fade-in">
-                <!-- Toolbar for Board -->
-                <div class="board-toolbar glass-panel vertical">
-                    <button id="tool-image" class="tool-btn" title="Add Image">
-                        <span class="material-icons-round">add_photo_alternate</span>
-                        <input type="file" id="image-upload" multiple accept="image/*" class="hidden-input">
-                    </button>
-                    <button id="tool-text" class="tool-btn" title="Add Text/Label">
-                        <span class="material-icons-round">text_fields</span>
-                    </button>
-                    <button id="tool-arrow" class="tool-btn" title="Draw Arrow">
-                        <span class="material-icons-round">arrow_right_alt</span>
-                    </button>
-                    <div class="divider"></div>
-                    <button id="tool-clear" class="tool-btn danger" title="Clear Board">
-                        <span class="material-icons-round">delete_outline</span>
-                    </button>
-                </div>
-
-                <!-- The Infinite Canvas Workspace -->
-                <div id="workspace-canvas">
-                    <!-- Nodes (images, text) will be injected here via JS -->
-                    <canvas id="arrow-layer"></canvas>
-                </div>
-            </section>
-
-            <!-- Tab: Notes -->
-            <section id="tab-notes" class="tab-pane fade-in">
-                <div class="notes-container glass-panel">
-                    <div class="note-section full-width-note">
-                        <h3><span class="material-icons-round">edit_note</span>Shoot Notepad</h3>
-                        <textarea class="rich-textarea master-notepad" placeholder="Jot down everything you need for this shoot here! 
-
-Here are some things you might want to consider:
-
-📍 LOCATION & LOGISTICS
-- What's the address or meeting point?
-- Is there a hike involved? Parking situation?
-- Do you need a permit?
-- What time is sunset/golden hour?
-
-📸 CAMERA & GEAR
-- Which camera bodies and lenses are you bringing? (e.g., 50mm, 85mm)
-- Lighting: Speedlites, strobes, reflectors?
-- Accessories: SD Cards, extra batteries, ND filters, prism?
-
-👗 CLIENT DETAILS & VIBE
-- Who are you shooting? 
-- What are they wearing? (Flowy dress, casual, formal?)
-- Are there any insecurities or specific preferences they mentioned?
-
-📋 SHOT LIST MUST-HAVES
-1. 
-2. 
-3. "></textarea>
-                    </div>
-                </div>
-            </section>
-
-            <!-- Tab: Calendar -->
-            <section id="tab-calendar" class="tab-pane fade-in">
-                <div class="calendar-container glass-panel">
-                    <div id="calendar-wrapper" class="full-width-calendar">
-                        <iframe id="google-calendar-iframe" class="hidden" src="" style="border: 0" width="100%" height="100%" frameborder="0" scrolling="no"></iframe>
-                        <div id="calendar-placeholder" class="placeholder-content">
-                            <span class="material-icons-round" style="font-size: 48px; margin-bottom: 1rem; color: var(--accent-color);">calendar_today</span>
-                            <h3>No Calendar Connected</h3>
-                            <p style="color: var(--text-secondary);">Head to Settings to paste your Google Calendar Embed URL.</p>
+        <div id="app-container" class="app-layout hidden">
+            <header class="top-nav glass-panel">
+                <div class="nav-left">
+                    <div class="brand-lockup">
+                        <span class="material-icons-round logo-icon">photo_camera</span>
+                        <div>
+                            <p class="eyebrow compact">Photoshoot Planner</p>
+                            <div class="project-title-wrapper" id="project-title-wrapper" title="Change shoot type">
+                                <h2 id="project-title">Untitled Shoot</h2>
+                                <span class="material-icons-round" id="title-chevron">expand_more</span>
+                                <div id="shoot-type-dropdown" class="dropdown-menu glass-panel hidden">
+                                    <div class="dropdown-label">Change Session Type</div>
+                                    <button class="dropdown-item shoot-type-option" data-type="Senior Portraits"><span class="material-icons-round">school</span>Senior Portraits</button>
+                                    <button class="dropdown-item shoot-type-option" data-type="Graduation Portraits"><span class="material-icons-round">workspace_premium</span>Graduation Portraits</button>
+                                    <button class="dropdown-item shoot-type-option" data-type="Boudoir"><span class="material-icons-round">favorite</span>Boudoir</button>
+                                    <button class="dropdown-item shoot-type-option" data-type="Headshots"><span class="material-icons-round">person</span>Headshots</button>
+                                    <button class="dropdown-item shoot-type-option" data-type="Creative Session"><span class="material-icons-round">auto_awesome</span>Creative Session</button>
+                                    <button class="dropdown-item shoot-type-option" data-type="Custom"><span class="material-icons-round">draw</span>Custom / Other...</button>
+                                </div>
+                            </div>
                         </div>
                     </div>
                 </div>
-            </section>
 
-        </main>
-    </div>
+                <nav class="nav-tabs" aria-label="Workspace Tabs">
+                    <button class="tab-btn active" data-tab="board">
+                        <span class="material-icons-round">dashboard_customize</span>
+                        <span>Board</span>
+                    </button>
+                    <button class="tab-btn" data-tab="notes">
+                        <span class="material-icons-round">notes</span>
+                        <span>Prep Notes</span>
+                    </button>
+                    <button class="tab-btn" data-tab="calendar">
+                        <span class="material-icons-round">calendar_month</span>
+                        <span>Schedule</span>
+                    </button>
+                </nav>
 
-    <!-- Settings Panel (Slide-out) -->
-    <div id="settings-panel" class="settings-panel glass-panel hidden">
-        <div class="settings-header">
-            <h2><span class="material-icons-round">settings</span> Settings</h2>
-            <button id="btn-close-settings" class="btn btn-icon btn-secondary">
-                <span class="material-icons-round">close</span>
-            </button>
+                <div class="nav-actions">
+                    <div class="save-indicator" id="save-indicator" data-state="idle">
+                        <span class="save-dot"></span>
+                        <span id="save-indicator-text">Ready</span>
+                    </div>
+                    <button id="btn-projects" class="btn btn-icon btn-secondary" title="Projects">
+                        <span class="material-icons-round">folder_open</span>
+                    </button>
+                    <button id="btn-settings" class="btn btn-icon btn-secondary" title="Settings">
+                        <span class="material-icons-round">tune</span>
+                    </button>
+                    <div class="dropdown-container">
+                        <button id="btn-export-toggle" class="btn btn-primary export-btn">
+                            <span class="material-icons-round">ios_share</span>
+                            <span>Export</span>
+                        </button>
+                        <div id="export-dropdown" class="dropdown-menu glass-panel hidden">
+                            <div class="dropdown-label">Share Your Board</div>
+                            <button class="dropdown-item" id="export-png"><span class="material-icons-round">image</span>Export as PNG</button>
+                            <button class="dropdown-item" id="export-pdf"><span class="material-icons-round">picture_as_pdf</span>Export as PDF</button>
+                            <button class="dropdown-item" id="export-email"><span class="material-icons-round">mail</span>Send via Share Sheet</button>
+                        </div>
+                    </div>
+                </div>
+            </header>
+
+            <main class="content-area">
+                <section id="tab-board" class="tab-pane active fade-in">
+                    <aside class="board-toolbar glass-panel">
+                        <button id="tool-image" class="tool-btn" title="Add reference images">
+                            <span class="material-icons-round">add_photo_alternate</span>
+                            <input type="file" id="image-upload" multiple accept="image/*" class="hidden-input">
+                        </button>
+                        <button id="tool-text" class="tool-btn" title="Add a text note">
+                            <span class="material-icons-round">sticky_note_2</span>
+                        </button>
+                        <button id="tool-arrow" class="tool-btn" title="Connect two items">
+                            <span class="material-icons-round">timeline</span>
+                        </button>
+                        <div class="divider"></div>
+                        <button id="tool-clear" class="tool-btn danger" title="Clear the board">
+                            <span class="material-icons-round">delete_sweep</span>
+                        </button>
+                    </aside>
+
+                    <div class="board-hud">
+                        <div class="board-intro glass-panel">
+                            <p class="eyebrow compact" id="project-kicker">Session plan</p>
+                            <h3>Use the board to map poses, references, props, and visual story.</h3>
+                            <p id="board-summary">Add a few images, drop in note cards, then connect related ideas with arrows.</p>
+                        </div>
+                        <div class="board-meta glass-panel">
+                            <div>
+                                <span class="meta-label">Board status</span>
+                                <strong id="board-stats">0 items, 0 connections</strong>
+                            </div>
+                            <div>
+                                <span class="meta-label">Shortcuts</span>
+                                <strong>Drag to pan, wheel to zoom</strong>
+                            </div>
+                        </div>
+                    </div>
+
+                    <div class="board-zoom-controls glass-panel">
+                        <button type="button" id="zoom-out" class="btn btn-icon btn-secondary" title="Zoom out">
+                            <span class="material-icons-round">remove</span>
+                        </button>
+                        <div id="zoom-level" class="zoom-level">100%</div>
+                        <button type="button" id="zoom-in" class="btn btn-icon btn-secondary" title="Zoom in">
+                            <span class="material-icons-round">add</span>
+                        </button>
+                        <button type="button" id="zoom-reset" class="btn btn-icon btn-secondary" title="Reset view">
+                            <span class="material-icons-round">center_focus_strong</span>
+                        </button>
+                    </div>
+
+                    <div id="workspace-canvas">
+                        <div id="board-empty-state" class="empty-board-state glass-panel">
+                            <span class="material-icons-round">collections</span>
+                            <h3>Your board is ready for references.</h3>
+                            <p>Drop in inspiration images, write quick direction notes, and connect ideas to build the flow of the shoot.</p>
+                            <div class="empty-actions">
+                                <label class="btn btn-primary empty-upload-btn">
+                                    <span class="material-icons-round">upload</span>
+                                    <span>Add Images</span>
+                                    <input type="file" id="empty-image-upload" multiple accept="image/*" class="hidden-input">
+                                </label>
+                                <button type="button" id="empty-add-note" class="btn btn-secondary">
+                                    <span class="material-icons-round">edit_note</span>
+                                    <span>Add Note Card</span>
+                                </button>
+                            </div>
+                        </div>
+                        <div id="board-scene">
+                            <canvas id="arrow-layer"></canvas>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-notes" class="tab-pane fade-in">
+                    <div class="notes-grid">
+                        <div class="notes-panel glass-panel">
+                            <div class="section-header">
+                                <div>
+                                    <p class="eyebrow compact">Master Prep Notes</p>
+                                    <h3>Keep logistics, shot ideas, and client details in one place.</h3>
+                                </div>
+                                <div class="inline-status" id="notes-status">Autosaves as you type</div>
+                            </div>
+                            <textarea id="master-notepad" class="master-notepad" placeholder="Location, timing, weather, wardrobe, lenses, must-have frames, client preferences..."></textarea>
+                        </div>
+
+                        <div class="prep-sidebar">
+                            <div class="prep-card glass-panel">
+                                <p class="eyebrow compact">Pre-Shoot Check</p>
+                                <textarea id="preshoot-checklist" class="sidebar-notes" placeholder="- Confirm location, parking, and permit details&#10;- List your hero shots before the day gets busy&#10;- Capture outfit notes and confidence cues for the client&#10;- Prep gear, batteries, memory cards, and backup lighting"></textarea>
+                            </div>
+                            <div class="prep-card glass-panel">
+                                <p class="eyebrow compact">Suggested Workflow</p>
+                                <ul class="checklist">
+                                    <li>Start the board with visual references.</li>
+                                    <li>Use note cards for pose direction or prop reminders.</li>
+                                    <li>Keep the notes tab for logistics and client comms.</li>
+                                    <li>Embed your calendar once so each project stays grounded in real dates.</li>
+                                </ul>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+
+                <section id="tab-calendar" class="tab-pane fade-in">
+                    <div class="calendar-shell glass-panel">
+                        <div class="section-header">
+                            <div>
+                                <p class="eyebrow compact">Schedule View</p>
+                                <h3>Keep your session timing in sight while you plan.</h3>
+                            </div>
+                            <p class="calendar-help">Paste a public Google Calendar embed URL in Settings to show your schedule here.</p>
+                        </div>
+                        <div id="calendar-wrapper" class="full-width-calendar">
+                            <iframe id="google-calendar-iframe" class="hidden" src="" title="Google Calendar" frameborder="0" scrolling="no"></iframe>
+                            <div id="calendar-placeholder" class="placeholder-content">
+                                <span class="material-icons-round">calendar_today</span>
+                                <h3>No calendar connected yet</h3>
+                                <p>Add your Google Calendar embed link in Settings so dates and planning stay in the same workspace.</p>
+                            </div>
+                        </div>
+                    </div>
+                </section>
+            </main>
         </div>
 
-        <div class="settings-content">
-            <div class="input-group">
-                <label for="app-theme">App Theme</label>
-                <select id="app-theme" name="app-theme">
-                    <option value="light">Light Mode</option>
-                    <option value="dark">Dark Mode</option>
-                </select>
+        <div id="settings-panel" class="settings-panel glass-panel hidden">
+            <div class="settings-header">
+                <div>
+                    <p class="eyebrow compact">Workspace Settings</p>
+                    <h2>Customize how planning feels.</h2>
+                </div>
+                <button id="btn-close-settings" class="btn btn-icon btn-secondary" title="Close settings">
+                    <span class="material-icons-round">close</span>
+                </button>
             </div>
 
-            <div class="input-group">
-                <label for="google-calendar-url">Google Calendar Embed URL</label>
-                <input type="text" id="google-calendar-url" placeholder="https://calendar.google.com/calendar/embed?src=...">
-                <small style="color: rgba(0,0,0,0.5); font-size: 0.8rem; margin-top: 4px; display: block;">Paste your 'Public URL' or 'Embed URL' here.</small>
+            <div class="settings-content">
+                <div class="input-group">
+                    <label for="app-theme">Theme</label>
+                    <select id="app-theme" name="app-theme">
+                        <option value="light">Editorial Light</option>
+                        <option value="dark">Studio Dark</option>
+                    </select>
+                </div>
+
+                <div class="input-group">
+                    <label for="google-calendar-url">Google Calendar Embed URL</label>
+                    <input type="text" id="google-calendar-url" placeholder="https://calendar.google.com/calendar/embed?src=...">
+                    <small class="field-help">You can paste the full iframe embed code too. We will extract the URL for you.</small>
+                </div>
+
+                <button id="btn-save-settings" class="btn btn-primary">
+                    <span class="material-icons-round">save</span>
+                    <span>Save Settings</span>
+                </button>
+            </div>
+        </div>
+
+        <div id="projects-panel" class="settings-panel glass-panel hidden">
+            <div class="settings-header">
+                <div>
+                    <p class="eyebrow compact">Project Library</p>
+                    <h2>Save and reopen shoot plans.</h2>
+                </div>
+                <button id="btn-close-projects" class="btn btn-icon btn-secondary" title="Close projects">
+                    <span class="material-icons-round">close</span>
+                </button>
             </div>
 
-            <button id="btn-save-settings" class="btn btn-primary mt-4">
-                <span class="material-icons-round">save</span> Save Settings
-            </button>
-        </div>
-    </div>
-
-    <!-- Projects Panel (Slide-out) -->
-    <div id="projects-panel" class="settings-panel glass-panel hidden">
-        <div class="settings-header">
-            <h2><span class="material-icons-round">folder_open</span> My Projects</h2>
-            <button id="btn-close-projects" class="btn btn-icon btn-secondary">
-                <span class="material-icons-round">close</span>
-            </button>
-        </div>
-        <div class="settings-content">
-            <p style="color:var(--text-secondary); font-size:0.85rem; margin-bottom:1rem;">Projects are saved as <code>.json</code> files to a folder you choose on your computer or SSD.</p>
-            <div style="display:flex; flex-direction:column; gap:0.75rem;">
-                <button id="btn-pick-folder" class="btn btn-secondary" style="width:100%; justify-content:center;">
-                    <span class="material-icons-round">drive_folder_upload</span> Choose Save Folder
+            <div class="settings-content">
+                <p class="panel-copy">Choose one project folder, give this shoot a file name, then save and reopen projects from the same place.</p>
+                <button id="btn-pick-folder" class="btn btn-secondary panel-btn">
+                    <span class="material-icons-round">drive_folder_upload</span>
+                    <span>Choose Project Folder</span>
                 </button>
-                <div id="folder-status" style="font-size:0.8rem; color:var(--text-secondary); text-align:center;">No folder selected</div>
-                <div class="divider" style="margin:0;"></div>
-                <button id="btn-open-file" class="btn btn-secondary" style="width:100%; justify-content:center;">
-                    <span class="material-icons-round">file_open</span> Open a Saved Project File
+                <input type="file" id="project-import-input" class="hidden" accept=".json,application/json">
+                <div id="folder-status" class="folder-status">No folder selected</div>
+                <div class="input-group">
+                    <label for="project-file-name">Project File Name</label>
+                    <input type="text" id="project-file-name" placeholder="senior-portraits-madison">
+                    <small class="field-help">Saved as a <code>.json</code> file inside the connected project folder.</small>
+                </div>
+                <button id="btn-save-project" class="btn btn-primary panel-btn" disabled>
+                    <span class="material-icons-round">save</span>
+                    <span>Save Current Project</span>
                 </button>
-                <button id="btn-save-project" class="btn btn-primary" style="width:100%; justify-content:center;" disabled>
-                    <span class="material-icons-round">save</span> Save Current Project
-                </button>
-                <button id="btn-new-project" class="btn btn-secondary" style="width:100%; justify-content:center;">
-                    <span class="material-icons-round">add_circle_outline</span> New Project
-                </button>
-                <div class="divider" style="margin:0;"></div>
-                <div style="display:flex; align-items:center; justify-content:space-between;">
-                    <h4 style="margin:0; color:var(--text-primary); font-size:0.9rem;">Saved Projects</h4>
-                    <button id="btn-grant-access" class="btn btn-secondary" style="font-size:0.75rem; padding:4px 10px; display:none;">
-                        <span class="material-icons-round" style="font-size:14px;">lock_open</span> Grant Access
+                <div class="project-actions-inline">
+                    <button id="btn-open-file" class="btn btn-secondary panel-btn">
+                        <span class="material-icons-round">upload_file</span>
+                        <span>Import Project</span>
+                    </button>
+                    <button id="btn-new-project" class="btn btn-secondary panel-btn">
+                        <span class="material-icons-round">add_circle</span>
+                        <span>New Project</span>
                     </button>
                 </div>
-                <div id="projects-list" style="display:flex; flex-direction:column; gap:0.5rem; max-height:300px; overflow-y:auto;">
-                    <div style="color:var(--text-secondary); font-size:0.85rem; text-align:center; padding:1rem;">Select a folder to see your saved projects.</div>
+                <button id="btn-grant-access" class="btn btn-secondary panel-btn hidden">
+                    <span class="material-icons-round">lock_open</span>
+                    <span>Grant Folder Access</span>
+                </button>
+
+                <div class="saved-projects-header">
+                    <p class="eyebrow compact">Saved Projects In Folder</p>
+                </div>
+                <div id="projects-list" class="projects-list">
+                    <div class="projects-empty">Choose a project folder to browse saved files.</div>
                 </div>
             </div>
         </div>
+
+        <div id="toast-region" class="toast-region" aria-live="polite" aria-atomic="true"></div>
     </div>
 
-    <!-- Scripts -->
     <script src="https://cdnjs.cloudflare.com/ajax/libs/localforage/1.10.0/localforage.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
     <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
