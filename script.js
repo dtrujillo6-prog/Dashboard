@@ -10,8 +10,6 @@ const dom = {
     customTypeInput: document.getElementById('custom-type'),
     appContainer: document.getElementById('app-container'),
     projectTitle: document.getElementById('project-title'),
-    projectKicker: document.getElementById('project-kicker'),
-    boardSummary: document.getElementById('board-summary'),
     boardStats: document.getElementById('board-stats'),
     saveIndicator: document.getElementById('save-indicator'),
     saveIndicatorText: document.getElementById('save-indicator-text'),
@@ -118,7 +116,9 @@ function init() {
     });
     dom.emptyAddNote.addEventListener('click', handleAddText);
     dom.toolText.addEventListener('click', handleAddText);
-    dom.toolArrow.addEventListener('click', toggleArrowMode);
+    if (dom.toolArrow) {
+        dom.toolArrow.addEventListener('click', toggleArrowMode);
+    }
     dom.toolClear.addEventListener('click', clearBoard);
     dom.zoomOut.addEventListener('click', () => zoomBy(-0.1));
     dom.zoomIn.addEventListener('click', () => zoomBy(0.1));
@@ -538,7 +538,9 @@ function toggleArrowMode() {
 function setInteractionMode(mode) {
     interactionState.mode = mode;
     const isArrowMode = mode === 'draw_arrow';
-    dom.toolArrow.classList.toggle('active', isArrowMode);
+    if (dom.toolArrow) {
+        dom.toolArrow.classList.toggle('active', isArrowMode);
+    }
     dom.workspace.style.cursor = isArrowMode ? 'crosshair' : 'grab';
     if (isArrowMode) {
         deselectAll();
@@ -612,7 +614,7 @@ function renderLoop() {
 
 function handleWorkspaceWheel(event) {
     event.preventDefault();
-    const delta = event.deltaY < 0 ? 0.1 : -0.1;
+    const delta = Math.max(-0.035, Math.min(0.035, -event.deltaY * 0.0012));
     zoomBy(delta, event.clientX, event.clientY);
 }
 
@@ -778,8 +780,6 @@ async function loadState() {
 
 function updateProjectUI() {
     dom.projectTitle.textContent = appState.projectName;
-    dom.projectKicker.textContent = appState.projectType || 'Session plan';
-    dom.boardSummary.textContent = `${appState.projectName} stays organized across the board, prep notes, and schedule so the shoot day feels lighter.`;
     if (!appState.projectFileName) {
         appState.projectFileName = slugifyProjectName(appState.projectName);
     }
